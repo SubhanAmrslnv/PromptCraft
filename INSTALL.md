@@ -43,21 +43,6 @@ Inside Claude Code, type:
 
 This checks that all required files are in place and your `settings.json` is valid.
 
-### 5. Set your API key (if not already set)
-
-If `/init` reports `ANTHROPIC_API_KEY` is missing, add it to your shell profile:
-
-```sh
-# ~/.bashrc or ~/.zshrc
-export ANTHROPIC_API_KEY="sk-ant-..."
-```
-
-Then reload your shell:
-
-```sh
-source ~/.bashrc   # or source ~/.zshrc
-```
-
 ## Verify
 
 After setup, run a quick test:
@@ -73,5 +58,3 @@ Claude Code should return a well-structured prompt. If it does, everything is wo
 **`/craft` or `/init` not found**
 Make sure you launched `claude` from inside the `.claude` directory, or from the repo root — Claude Code looks for `.claude/commands/` relative to the working directory.
 
-**`ANTHROPIC_API_KEY` not recognized after adding to profile**
-Run `source ~/.bashrc` (or `~/.zshrc`) in your current terminal, then relaunch `claude`.

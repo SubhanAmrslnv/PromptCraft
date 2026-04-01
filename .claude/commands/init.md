@@ -64,18 +64,7 @@ cp .claude/hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
 chmod +x .git/hooks/prepare-commit-msg
 ```
 
-## 5. Verify ANTHROPIC_API_KEY
-
-Check if the `ANTHROPIC_API_KEY` environment variable is set.
-If it is not set, remind the user to add it to their shell profile (`~/.bashrc` or `~/.zshrc`):
-
-```sh
-export ANTHROPIC_API_KEY="sk-ant-..."
-```
-
-This key is required when using Claude API features from within PromptCraft.
-
-## 6. Report
+## 5. Report
 
 Print a concise summary table:
 
@@ -86,6 +75,5 @@ Print a concise summary table:
 | `.claude/commands/craft.md` | ✓ exists / ✗ missing |
 | `.claude/settings.json` | ✓ valid / ✗ written default / ✗ missing |
 | `.git/hooks/prepare-commit-msg` | ✓ installed / ✗ installed now |
-| `ANTHROPIC_API_KEY` | ✓ set / ✗ not set |
 
 List any manual steps the user still needs to take.

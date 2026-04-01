@@ -34,7 +34,6 @@ Run `/init` once to verify everything is set up. After that, use `/craft` to gen
 ## Requirements
 
 - [Claude Code](https://claude.ai/code) installed and authenticated
-- `ANTHROPIC_API_KEY` set in your shell (needed for Claude API usage)
 
 ## Prompts library
 
