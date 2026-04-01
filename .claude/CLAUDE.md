@@ -15,13 +15,14 @@ The repository currently contains Claude Code configuration only; no application
 .claude/commands/                 Custom slash commands (Markdown files)
   craft.md                        /craft   — transforms a raw idea into an optimized Claude Code prompt
   init.md                         /init    — verifies project setup on a new machine
-  migrate.md                      /migrate — VMMS migration reference (superseded by instructions below)
 .claude/hooks/                    Event-driven shell hooks
   git-guard.sh                    PreToolUse hook — blocks destructive git commands
   ensure-git-hooks.sh             PreToolUse hook — installs git hooks before the first commit
   prepare-commit-msg              Git hook template — adds diff summary, strips Co-Authored-By: Claude
 .claude/settings.json             Project-level Claude Code permissions, denied commands, and hooks
 .claude/keybindings.json          Project-level keyboard shortcut overrides
+prompts/                          Curated prompt templates in <context>/<rule>/<input>/<output> format
+  index.md                        Catalog and usage guide for all prompt templates
 ```
 
 ## Slash Commands
@@ -267,6 +268,34 @@ Respond in this exact order:
 4. **Verification** — confirm the full Controller → Service → Repository chain has no secondary inconsistencies introduced by the fix.
 
 ---
+
+## Answer Structure
+
+Every response must be structured using these four XML blocks:
+
+```xml
+<context>
+  Restate the relevant background — what system, codebase, or constraint is in scope.
+  Keep it brief; one or two sentences is enough.
+</context>
+
+<rule>
+  The constraints, conventions, or rules that govern the answer.
+  Use named subsections (e.g., ### Naming, ### Performance) when more than three rules apply.
+</rule>
+
+<input>
+  The specific request being answered, restated precisely.
+  If multiple modes or variants are valid, name each one.
+</input>
+
+<output>
+  The actual answer — code, steps, explanation, or analysis.
+  Follow the exact order required by the task. Omit sections that are not applicable.
+</output>
+```
+
+Apply this structure to every response regardless of topic. Do not skip blocks; use an empty block (`<rule></rule>`) only if there are genuinely no applicable rules.
 
 ## Conventions
 

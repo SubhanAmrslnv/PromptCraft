@@ -36,6 +36,16 @@ Run `/init` once to verify everything is set up. After that, use `/craft` to gen
 - [Claude Code](https://claude.ai/code) installed and authenticated
 - `ANTHROPIC_API_KEY` set in your shell (needed for Claude API usage)
 
+## Prompts library
+
+`prompts/` contains reusable prompt templates. Every template follows the structured XML format:
+
+```
+<context> → <rule> → <input> → <output>
+```
+
+See [`prompts/index.md`](prompts/index.md) for the full catalog.
+
 ## See also
 
 - `INSTALL.md` — step-by-step setup guide
