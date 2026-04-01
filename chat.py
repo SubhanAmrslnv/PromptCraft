@@ -14,9 +14,8 @@ try:
     from textual.containers import Horizontal, VerticalScroll
     from textual import work
     import pyperclip
-    import pyfiglet
 except ImportError:
-    print("Missing dependencies. Run:  pip install textual pyperclip pyfiglet")
+    print("Missing dependencies. Run:  pip install textual pyperclip")
     sys.exit(1)
 
 SYSTEM_PROMPT_BASE = (
@@ -47,13 +46,6 @@ def append_rules(new_rules: str) -> None:
     existing = load_rules()
     combined = (existing + "\n" + new_rules).strip()
     RULES_FILE.write_text(combined, encoding="utf-8")
-
-
-def make_logo() -> str:
-    try:
-        return pyfiglet.figlet_format("PromptCraft", font="slant")
-    except Exception:
-        return "  PromptCraft\n"
 
 
 def ts() -> str:
@@ -116,61 +108,59 @@ class PromptCraftApp(App):
 
     CSS = """
     Screen {
-        background: #0c0c0c;
-        layers: base;
+        background: #1a1a1a;
     }
 
     /* ── header ── */
     #logo {
         content-align: center middle;
-        color: cyan;
+        color: #da7756;
         text-style: bold;
         padding: 1 4 0 4;
-        height: auto;
+        height: 2;
     }
     #tagline {
         content-align: center middle;
-        color: #595959;
+        color: #444444;
         padding: 0 4 1 4;
-        height: auto;
+        height: 1;
     }
     #divider-top {
         height: 1;
-        background: #262626;
+        background: #252525;
     }
 
     /* ── messages ── */
     #messages {
         height: 1fr;
-        padding: 0 3;
+        padding: 0 4;
     }
     .msg-label {
-        color: #595959;
+        color: #464646;
         height: auto;
         padding: 1 0 0 0;
     }
     .msg-user {
-        background: #0b1f10;
-        border: round #245530;
-        color: #7be08a;
+        background: #2c2c2c;
+        border: round #3a3a3a;
+        color: #ececec;
         padding: 0 2;
-        margin: 0 12 0 0;
+        margin: 0 0 0 20;
         height: auto;
     }
     .msg-claude {
-        background: #090f1e;
-        border: round #1a3a5c;
-        color: #ffffff;
+        background: transparent;
+        color: #ececec;
         padding: 0 2;
-        margin: 0 0 0 12;
+        margin: 0 20 0 0;
         height: auto;
     }
     .msg-claude Markdown {
         background: transparent;
-        color: #ffffff;
+        color: #ececec;
     }
     .msg-system {
-        color: #595959;
+        color: #464646;
         text-style: italic;
         padding: 0 2;
         height: auto;
@@ -180,112 +170,105 @@ class PromptCraftApp(App):
     /* ── input area ── */
     #divider-bottom {
         height: 1;
-        background: #262626;
+        background: #252525;
     }
     #input-row {
         height: auto;
-        padding: 1 3 0 3;
+        padding: 1 4 0 4;
         align: left middle;
     }
     #user-input {
         width: 1fr;
-        background: #161616;
-        border: round #4d4d4d;
-        color: white;
+        background: #242424;
+        border: round #383838;
+        color: #ececec;
     }
     #user-input:focus {
-        border: round cyan;
+        border: round #da7756;
     }
 
     /* ── action buttons ── */
     #buttons {
         height: auto;
-        padding: 1 3 0 3;
+        padding: 1 4 0 4;
         align: left middle;
     }
     Button {
         margin: 0 1 0 0;
-        min-width: 14;
-        border: tall #4d4d4d;
-        background: #161616;
-        color: #808080;
+        min-width: 12;
+        border: none;
+        background: #242424;
+        color: #585858;
     }
     Button:hover {
-        text-style: bold;
+        background: #2e2e2e;
+        color: #dadada;
     }
     #btn-clear {
-        border: tall #5c5010;
-        background: #151200;
-        color: #ccb840;
+        color: #7a6830;
     }
     #btn-clear:hover {
-        background: #252200;
-        color: #ffff00;
+        background: #26200e;
+        color: #c8a830;
     }
     #btn-exit {
-        border: tall #5c1a1a;
-        background: #150505;
-        color: #cc4444;
+        color: #7a3030;
     }
     #btn-exit:hover {
-        background: #250808;
-        color: #ff5555;
+        background: #261414;
+        color: #c84040;
     }
     #btn-info {
-        border: tall #3a3a6a;
-        background: #0e0e25;
-        color: #7878cc;
+        color: #38507a;
     }
     #btn-info:hover {
-        background: #1a1a35;
-        color: #aaaaff;
+        background: #12182a;
+        color: #6080c8;
     }
     #btn-like {
-        border: tall #5c2060;
-        background: #150520;
-        color: #cc55dd;
+        color: #9a4a30;
     }
     #btn-like:hover {
-        background: #250835;
-        color: #ff88ff;
+        background: #261810;
+        color: #da7756;
     }
 
     /* ── copy cards ── */
     #cards {
         height: 5;
-        padding: 1 3 1 3;
+        padding: 1 4 1 4;
     }
     CopyCard {
         height: 4;
         padding: 0 2;
-        border: round #4d4d4d;
-        background: #161616;
-        color: #808080;
+        border: round #2e2e2e;
+        background: #212121;
+        color: #484848;
     }
     CopyCard:hover {
-        border: round #808080;
-        text-style: bold;
+        border: round #3a3a3a;
+        color: #dadada;
     }
     #card-question {
         width: 1fr;
-        border: round #1e5830;
-        background: #071508;
-        color: #4acc70;
         margin: 0 1 0 0;
+        border: round #3a2e1c;
+        color: #7a5e38;
     }
     #card-question:hover {
-        border: round #4acc70;
-        background: #0d2812;
+        border: round #da7756;
+        color: #da9870;
+        background: #201610;
     }
     #card-answer {
         width: 1fr;
-        border: round #1e5c78;
-        background: #071520;
-        color: #4aaccc;
+        border: round #22263a;
+        color: #3c4468;
     }
     #card-answer:hover {
-        border: round #4aaccc;
-        background: #0d2535;
+        border: round #4a5898;
+        color: #7888c8;
+        background: #101420;
     }
     """
 
@@ -326,11 +309,8 @@ class PromptCraftApp(App):
     # ── layout ────────────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
-        yield Static(make_logo(), id="logo")
-        yield Static(
-            "✦  craft prompts · chat with claude · copy answers  ✦",
-            id="tagline",
-        )
+        yield Static("✦  PromptCraft", id="logo")
+        yield Static("craft prompts · chat with claude · copy answers", id="tagline")
         yield Static("", id="divider-top")
         yield VerticalScroll(id="messages")
         yield Static("", id="divider-bottom")
@@ -397,11 +377,11 @@ class PromptCraftApp(App):
 
         self._append(
             Static(
-                f"[#595959]#{n}[/#595959]  [bold green]You[/bold green]  [#595959]{ts()}[/#595959]",
+                f"[#ececec]You[/#ececec]  [#464646]{ts()}[/#464646]",
                 classes="msg-label",
             ),
             Static(text, classes="msg-user"),
-            Static("  ···  Claude is thinking", classes="msg-system", id="thinking"),
+            Static("  [#464646]···  Thinking…[/#464646]", classes="msg-system", id="thinking"),
         )
 
         self.query_one("#user-input", Input).disabled = True
@@ -446,7 +426,7 @@ class PromptCraftApp(App):
             self.query_one("#card-answer", CopyCard).set_content(reply)
 
         label = Static(
-            f"[#595959]#{n}[/#595959]  [bold bright_blue]Claude[/bold bright_blue]  [#595959]{ts()}[/#595959]",
+            f"[#da7756]✦[/#da7756]  [#ececec]Claude[/#ececec]  [#464646]{ts()}[/#464646]",
             classes="msg-label",
         )
         msg = Markdown(reply, classes="msg-claude") if success else \
@@ -552,8 +532,91 @@ def set_console_font_size(pt: int) -> None:
         pass
 
 
+# ── taskbar icon ─────────────────────────────────────────────────────────────
+
+def _make_app_icon() -> None:
+    """Write app.ico (32×32 RGBA PNG-in-ICO) next to this script if absent.
+
+    Design: six-spoke asterisk in Claude orange (#da7756) on dark (#1a1a1a).
+    Uses only stdlib — no Pillow required.
+    """
+    import math, struct, zlib
+
+    ico_path = Path(__file__).parent / "app.ico"
+    if ico_path.exists():
+        return
+
+    SIZE   = 32
+    BG     = (0x1a, 0x1a, 0x1a, 0xff)
+    FG     = (0xda, 0x77, 0x56, 0xff)
+    cx = cy = SIZE / 2
+    R_MAX   = 13.5
+    R_MIN   = 2.8
+    HALF_W  = 2.1
+    SPOKES  = 6
+
+    pixels = []
+    for y in range(SIZE):
+        row = []
+        for x in range(SIZE):
+            dx, dy = x - cx + 0.5, y - cy + 0.5
+            r = math.hypot(dx, dy)
+            color = BG
+            if R_MIN <= r <= R_MAX:
+                for i in range(SPOKES):
+                    a = math.pi * i / SPOKES
+                    perp = abs(-dx * math.sin(a) + dy * math.cos(a))
+                    if perp < HALF_W:
+                        color = FG
+                        break
+            row.append(color)
+        pixels.append(row)
+
+    def _chunk(tag: bytes, data: bytes) -> bytes:
+        body = tag + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+
+    ihdr = struct.pack(">II", SIZE, SIZE) + bytes([8, 6, 0, 0, 0])
+    raw  = b"".join(b"\x00" + bytes(c for px in row for c in px) for row in pixels)
+    png  = (
+        b"\x89PNG\r\n\x1a\n"
+        + _chunk(b"IHDR", ihdr)
+        + _chunk(b"IDAT", zlib.compress(raw))
+        + _chunk(b"IEND", b"")
+    )
+
+    ico = (
+        struct.pack("<HHH", 0, 1, 1)
+        + struct.pack("<BBBBHHII", SIZE, SIZE, 0, 0, 1, 32, len(png), 22)
+        + png
+    )
+    ico_path.write_bytes(ico)
+
+
+def _set_taskbar_icon() -> None:
+    """Load app.ico and apply it to the console window (small + large slots)."""
+    try:
+        ico_path = str(Path(__file__).parent / "app.ico")
+        hIcon = ctypes.windll.user32.LoadImageW(
+            None, ico_path,
+            1,           # IMAGE_ICON
+            0, 0,
+            0x10,        # LR_LOADFROMFILE
+        )
+        if not hIcon:
+            return
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd:
+            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hIcon)   # ICON_SMALL
+            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hIcon)   # ICON_BIG
+    except Exception:
+        pass
+
+
 # ── entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     set_console_font_size(16)
+    _make_app_icon()
+    _set_taskbar_icon()
     PromptCraftApp().run()
