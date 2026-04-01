@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """PromptCraft Chat — Textual TUI with clickable buttons."""
 
+import ctypes
+import ctypes.wintypes
 import subprocess
 import sys
 from datetime import datetime
@@ -373,7 +375,38 @@ class PromptCraftApp(App):
             self.exit()
 
 
+# ── console font ─────────────────────────────────────────────────────────────
+
+class _COORD(ctypes.Structure):
+    _fields_ = [("X", ctypes.c_short), ("Y", ctypes.c_short)]
+
+class _CONSOLE_FONT_INFOEX(ctypes.Structure):
+    _fields_ = [
+        ("cbSize",      ctypes.wintypes.ULONG),
+        ("nFont",       ctypes.wintypes.DWORD),
+        ("dwFontSize",  _COORD),
+        ("FontFamily",  ctypes.wintypes.UINT),
+        ("FontWeight",  ctypes.wintypes.UINT),
+        ("FaceName",    ctypes.c_wchar * 32),
+    ]
+
+def set_console_font_size(pt: int) -> None:
+    """Set the Windows console font size (point size → pixel height)."""
+    try:
+        STD_OUTPUT_HANDLE = ctypes.wintypes.DWORD(-11)
+        handle = ctypes.windll.kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
+        font = _CONSOLE_FONT_INFOEX()
+        font.cbSize = ctypes.sizeof(_CONSOLE_FONT_INFOEX)
+        ctypes.windll.kernel32.GetCurrentConsoleFontEx(handle, False, ctypes.byref(font))
+        font.dwFontSize.X = 0
+        font.dwFontSize.Y = pt
+        ctypes.windll.kernel32.SetCurrentConsoleFontEx(handle, False, ctypes.byref(font))
+    except Exception:
+        pass  # non-Windows or unsupported console — silently skip
+
+
 # ── entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    set_console_font_size(16)   # ~12pt at 96 DPI
     PromptCraftApp().run()
