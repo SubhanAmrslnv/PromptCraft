@@ -7,8 +7,8 @@ from datetime import datetime
 
 try:
     from textual.app import App, ComposeResult
-    from textual.widgets import Static, Input, Button, VerticalScroll, Markdown
-    from textual.containers import Horizontal, Vertical
+    from textual.widgets import Static, Input, Button, Markdown
+    from textual.containers import Horizontal, Vertical, VerticalScroll
     from textual import work
     import pyperclip
     import pyfiglet
