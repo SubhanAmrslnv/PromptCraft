@@ -146,12 +146,12 @@ class PromptCraftApp(ctk.CTk):
         hdr.pack(fill="x", padx=24, pady=(12, 0))
         ctk.CTkLabel(
             hdr, text="✦  PromptCraft",
-            font=ctk.CTkFont(size=20, weight="bold"),
+            font=ctk.CTkFont(size=26, weight="bold"),
             text_color=self.C_ORANGE,
         ).pack()
         ctk.CTkLabel(
             hdr, text="craft prompts · chat with claude · copy answers",
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=13, weight="bold"),
             text_color=self.C_DIM,
         ).pack()
 
@@ -164,7 +164,7 @@ class PromptCraftApp(ctk.CTk):
             self,
             fg_color=self.C_BG,
             text_color=self.C_TEXT,
-            font=ctk.CTkFont(family="Segoe UI", size=13),
+            font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
             wrap="word",
             state="disabled",
             corner_radius=0,
@@ -174,13 +174,18 @@ class PromptCraftApp(ctk.CTk):
         self._msg_box.pack(fill="both", expand=True, padx=24, pady=(8, 0))
 
         tb = self._msg_box._textbox
-        tb.tag_config("user_lbl",   foreground=self.C_DIM)
-        tb.tag_config("claude_lbl", foreground=self.C_ORANGE)
-        tb.tag_config("user_msg",   foreground=self.C_TEXT, lmargin1=20, lmargin2=20)
-        tb.tag_config("claude_msg", foreground=self.C_TEXT)
+        tb.tag_config("user_lbl",   foreground=self.C_DIM,
+                      font=("Segoe UI", 12, "bold"))
+        tb.tag_config("claude_lbl", foreground=self.C_ORANGE,
+                      font=("Segoe UI", 12, "bold"))
+        tb.tag_config("user_msg",   foreground=self.C_TEXT,
+                      font=("Segoe UI", 15, "bold"), lmargin1=20, lmargin2=20)
+        tb.tag_config("claude_msg", foreground=self.C_TEXT,
+                      font=("Segoe UI", 15, "bold"))
         tb.tag_config("system",     foreground=self.C_DIM,
-                      font=("Segoe UI", 11, "italic"))
-        tb.tag_config("error",      foreground=self.C_RED)
+                      font=("Segoe UI", 12, "italic bold"))
+        tb.tag_config("error",      foreground=self.C_RED,
+                      font=("Segoe UI", 15, "bold"))
 
         ctk.CTkFrame(self, height=1, fg_color=self.C_DIVID, corner_radius=0).pack(
             fill="x", pady=(6, 0)
@@ -192,13 +197,13 @@ class PromptCraftApp(ctk.CTk):
 
         self._input_box = ctk.CTkTextbox(
             inp_wrap,
-            height=72,
+            height=140,
             fg_color=self.C_BG2,
             text_color=self.C_DIM,
-            font=ctk.CTkFont(family="Segoe UI", size=13),
-            border_color="#383838",
-            border_width=1,
-            corner_radius=8,
+            font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
+            border_color="#da7756",
+            border_width=2,
+            corner_radius=10,
             wrap="word",
         )
         self._input_box.pack(fill="x")
@@ -212,7 +217,7 @@ class PromptCraftApp(ctk.CTk):
         ctk.CTkLabel(
             inp_wrap,
             text="Enter → send  ·  Shift+Enter → new line",
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11, weight="bold"),
             text_color=self.C_DIM,
         ).pack(anchor="e", pady=(2, 0))
 
@@ -221,9 +226,9 @@ class PromptCraftApp(ctk.CTk):
         btn_wrap.pack(fill="x", padx=24, pady=(8, 0))
 
         base = dict(
-            width=92, height=30, corner_radius=6, border_width=0,
+            width=100, height=34, corner_radius=8, border_width=0,
             fg_color=self.C_BG2, hover_color="#2e2e2e",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=13, weight="bold"),
         )
         ctk.CTkButton(btn_wrap, text="↺  Clear", text_color=self.C_GOLD,
                       command=self._do_clear, **base).pack(side="left", padx=(0, 6))
@@ -236,8 +241,8 @@ class PromptCraftApp(ctk.CTk):
         ctk.CTkButton(
             btn_wrap, text="➤  Send", text_color=self.C_ORANGE,
             fg_color="#2a1a10", hover_color="#3a2010",
-            font=ctk.CTkFont(size=12), width=80, height=30,
-            corner_radius=6, border_width=0,
+            font=ctk.CTkFont(size=13, weight="bold"), width=90, height=34,
+            corner_radius=8, border_width=0,
             command=self._send,
         ).pack(side="right")
 
@@ -250,9 +255,9 @@ class PromptCraftApp(ctk.CTk):
         self._card_q = ctk.CTkButton(
             cards, text="Question\n—",
             fg_color="#212121", hover_color="#201610",
-            text_color="#7a5e38", font=ctk.CTkFont(size=11),
-            height=52, corner_radius=8,
-            border_width=1, border_color="#3a2e1c",
+            text_color="#c8965a", font=ctk.CTkFont(size=12, weight="bold"),
+            height=58, corner_radius=10,
+            border_width=2, border_color="#3a2e1c",
             command=lambda: self._copy(self._last_question, "Question"),
         )
         self._card_q.grid(row=0, column=0, sticky="ew", padx=(0, 6))
@@ -260,9 +265,9 @@ class PromptCraftApp(ctk.CTk):
         self._card_a = ctk.CTkButton(
             cards, text="Answer\n—",
             fg_color="#212121", hover_color="#101420",
-            text_color="#3c4468", font=ctk.CTkFont(size=11),
-            height=52, corner_radius=8,
-            border_width=1, border_color="#22263a",
+            text_color="#6080c8", font=ctk.CTkFont(size=12, weight="bold"),
+            height=58, corner_radius=10,
+            border_width=2, border_color="#22263a",
             command=lambda: self._copy(self._last_reply, "Answer"),
         )
         self._card_a.grid(row=0, column=1, sticky="ew")
