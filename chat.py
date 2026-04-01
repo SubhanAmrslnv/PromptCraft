@@ -225,11 +225,35 @@ class PromptCraftApp(App):
 
     # ── input handler ─────────────────────────────────────────────────────────
 
+    INFO = """\
+[bold cyan]/info[/bold cyan]           Show this help message
+
+[bold cyan]/clear[/bold cyan]          Start a new conversation — wipes chat history and resets the session
+
+[bold cyan]ca[/bold cyan]              Copy Claude's last answer to the clipboard
+
+[bold cyan]cq[/bold cyan]              Copy your last question to the clipboard
+
+[bold cyan]⎘ Copy Answer[/bold cyan]   Button — same as typing [bold cyan]ca[/bold cyan]
+
+[bold cyan]⎘ Copy Question[/bold cyan] Button — same as typing [bold cyan]cq[/bold cyan]
+
+[bold cyan]↺ Clear Chat[/bold cyan]    Button — same as typing [bold cyan]/clear[/bold cyan]
+
+[bold cyan]✕ Exit[/bold cyan]          Button — close the application
+
+[dim]Anything else is sent to Claude as a message.[/dim]\
+"""
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         text = event.value.strip()
         if not text:
             return
         event.input.clear()
+
+        if text.lower() == "/info":
+            self._append(Static(self.INFO, classes="msg-system"))
+            return
 
         self._msg_count      += 1
         self._last_question   = text
@@ -237,7 +261,7 @@ class PromptCraftApp(App):
 
         self._append(
             Static(
-                f"[grey35]#{n}[/grey35]  [bold green]You[/bold green]  [grey35]{ts()}[/grey35]",
+                f"[#595959]#{n}[/#595959]  [bold green]You[/bold green]  [#595959]{ts()}[/#595959]",
                 classes="msg-label",
             ),
             Static(text, classes="msg-user"),
@@ -282,7 +306,7 @@ class PromptCraftApp(App):
             self._last_reply      = reply
 
         label = Static(
-            f"[grey35]#{n}[/grey35]  [bold bright_blue]Claude[/bold bright_blue]  [grey35]{ts()}[/grey35]",
+            f"[#595959]#{n}[/#595959]  [bold bright_blue]Claude[/bold bright_blue]  [#595959]{ts()}[/#595959]",
             classes="msg-label",
         )
         msg = Markdown(reply, classes="msg-claude") if success else \
