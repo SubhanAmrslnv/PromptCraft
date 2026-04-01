@@ -58,6 +58,28 @@ Every commit automatically runs `.git/hooks/prepare-commit-msg`, which:
 1. Strips any `Co-Authored-By: Claude` line from the message
 2. Appends a `git diff --cached --stat` summary as the commit body if no body was written
 
+### Commit Message Format
+
+Always write commit messages in this format:
+
+```
+<type>: <short subject (max 72 chars)>
+
+<detailed body — required>
+- What changed and where (file names, function names)
+- Why the change was made
+- Any side effects, dependencies added, or behavior differences
+- If a bug was fixed: what the bug was and what caused it
+```
+
+**Types:** `feat` · `fix` · `refactor` · `docs` · `chore` · `style` · `test`
+
+**Rules:**
+- Subject line is imperative mood ("add", not "added" or "adds")
+- Body is mandatory — never commit with subject only
+- Each bullet covers one logical change
+- Name the specific files or components affected
+
 ## Conventions
 
 - All slash command files live in `.claude/commands/` as plain Markdown.
