@@ -54,13 +54,13 @@ class PromptCraftApp(App):
     }
     #tagline {
         content-align: center middle;
-        color: grey35;
+        color: #595959;
         padding: 0 4 1 4;
         height: auto;
     }
     #divider-top {
         height: 1;
-        background: grey15;
+        background: #262626;
     }
 
     /* ── messages ── */
@@ -69,7 +69,7 @@ class PromptCraftApp(App):
         padding: 0 3;
     }
     .msg-label {
-        color: grey35;
+        color: #595959;
         height: auto;
         padding: 1 0 0 0;
     }
@@ -84,17 +84,17 @@ class PromptCraftApp(App):
     .msg-claude {
         background: #090f1e;
         border: round #1a3a5c;
-        color: bright_white;
+        color: #ffffff;
         padding: 0 2;
         margin: 0 0 0 12;
         height: auto;
     }
     .msg-claude Markdown {
         background: transparent;
-        color: bright_white;
+        color: #ffffff;
     }
     .msg-system {
-        color: grey35;
+        color: #595959;
         text-style: italic;
         padding: 0 2;
         height: auto;
@@ -104,7 +104,7 @@ class PromptCraftApp(App):
     /* ── input area ── */
     #divider-bottom {
         height: 1;
-        background: grey15;
+        background: #262626;
     }
     #input-row {
         height: auto;
@@ -114,7 +114,7 @@ class PromptCraftApp(App):
     #user-input {
         width: 1fr;
         background: #161616;
-        border: round grey30;
+        border: round #4d4d4d;
         color: white;
     }
     #user-input:focus {
@@ -130,9 +130,9 @@ class PromptCraftApp(App):
     Button {
         margin: 0 1 0 0;
         min-width: 18;
-        border: tall grey30;
+        border: tall #4d4d4d;
         background: #161616;
-        color: grey50;
+        color: #808080;
     }
     Button:hover {
         text-style: bold;
@@ -144,7 +144,7 @@ class PromptCraftApp(App):
     }
     #btn-copy-answer:hover {
         background: #0d2535;
-        color: bright_cyan;
+        color: #00ffff;
     }
     #btn-copy-question {
         border: tall #1e5830;
@@ -153,7 +153,7 @@ class PromptCraftApp(App):
     }
     #btn-copy-question:hover {
         background: #0d2812;
-        color: bright_green;
+        color: #00ff7f;
     }
     #btn-clear {
         border: tall #5c5010;
@@ -162,7 +162,7 @@ class PromptCraftApp(App):
     }
     #btn-clear:hover {
         background: #252200;
-        color: bright_yellow;
+        color: #ffff00;
     }
     #btn-exit {
         border: tall #5c1a1a;
@@ -171,7 +171,7 @@ class PromptCraftApp(App):
     }
     #btn-exit:hover {
         background: #250808;
-        color: bright_red;
+        color: #ff5555;
     }
     """
 
