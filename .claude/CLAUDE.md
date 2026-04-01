@@ -16,6 +16,7 @@ The repository currently contains Claude Code configuration only; no application
   craft.md                        /craft — transforms a raw idea into an optimized Claude Code prompt
   init.md                         /init  — verifies project setup on a new machine
 .claude/hooks/                    Event-driven shell hooks
+  git-guard.sh                    PreToolUse hook — blocks destructive git commands
   ensure-git-hooks.sh             PreToolUse hook — installs git hooks before the first commit
   prepare-commit-msg              Git hook template — adds diff summary, strips Co-Authored-By: Claude
 .claude/settings.json             Project-level Claude Code permissions, denied commands, and hooks
@@ -38,7 +39,7 @@ The repository currently contains Claude Code configuration only; no application
 
 ## Git Restrictions
 
-The following destructive git commands are blocked by `settings.json` and Claude must not run them:
+The following destructive git commands are blocked by `.claude/hooks/git-guard.sh` (a `PreToolUse` hook). Claude must not run them — the hook will block the call with exit code 2 and explain why:
 
 | Blocked command | Reason |
 |---|---|
