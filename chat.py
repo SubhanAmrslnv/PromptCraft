@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
-"""PromptCraft Chat — Textual TUI with clickable buttons."""
+"""PromptCraft Chat — CustomTkinter GUI"""
 
-import ctypes
-import ctypes.wintypes
 import subprocess
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 
 try:
-    from textual.app import App, ComposeResult
-    from textual.widgets import Static, Input, Button, Markdown
-    from textual.containers import Horizontal, VerticalScroll
-    from textual import work
+    import customtkinter as ctk
     import pyperclip
 except ImportError:
-    print("Missing dependencies. Run:  pip install textual pyperclip")
+    print("Missing dependencies. Run:  pip install customtkinter pyperclip")
     sys.exit(1)
+
+# ── Constants ─────────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT_BASE = """\
 Answer only what the user asks. Be direct and concise.
@@ -51,15 +49,15 @@ When a file path is outside the accessible directory:
 - Ask directly: one sentence of context, then a numbered list of exactly what code to paste.\
 """
 
+
 def _base_dir() -> Path:
-    """Folder next to the exe when frozen, or next to this script in dev."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
     return Path(__file__).parent
 
 
-RULES_FILE  = _base_dir() / "rules.md"
-CHAT_MODEL  = "haiku"   # alias: haiku | sonnet | opus  (haiku = fastest, no extended thinking)
+RULES_FILE = _base_dir() / "rules.md"
+CHAT_MODEL = "haiku"
 
 ANALYZE_PROMPT = (
     "Analyze the following assistant answer. "
@@ -87,345 +85,297 @@ def ts() -> str:
     return datetime.now().strftime("%H:%M")
 
 
-# ── Copy Card ─────────────────────────────────────────────────────────────────
-
-class CopyCard(Static):
-    """Clickable card that shows a content preview and copies to clipboard."""
-
-    can_focus = True
-
-    def __init__(self, label: str, card_id: str) -> None:
-        super().__init__(id=card_id)
-        self._label   = label
-        self._content = ""
-        self._refresh_display()
-
-    # ── public ────────────────────────────────────────────────────────────────
-
-    def set_content(self, text: str) -> None:
-        self._content = text
-        self._refresh_display()
-
-    # ── internal ──────────────────────────────────────────────────────────────
-
-    def _refresh_display(self) -> None:
-        preview = self._content
-        if len(preview) > 60:
-            preview = preview[:60] + "…"
-        if not preview:
-            preview = "—"
-        self.update(
-            f"[bold]{self._label}[/bold]\n"
-            f"[dim]{preview}[/dim]"
-        )
-
-    def _show_feedback(self, ok: bool) -> None:
-        icon = "✓  Copied!" if ok else "✗  Failed"
-        color = "green" if ok else "red"
-        self.update(f"[bold]{self._label}[/bold]\n[{color}]{icon}[/{color}]")
-        self.set_timer(1.5, self._refresh_display)
-
-    # ── events ────────────────────────────────────────────────────────────────
-
-    def on_click(self) -> None:
-        if not self._content:
-            return
-        try:
-            pyperclip.copy(self._content)
-            self._show_feedback(ok=True)
-        except Exception:
-            self._show_feedback(ok=False)
-
-
 # ── App ───────────────────────────────────────────────────────────────────────
 
-class PromptCraftApp(App):
+ctk.set_appearance_mode("dark")
 
-    CSS = """
-    Screen {
-        background: #1a1a1a;
-    }
 
-    /* ── header ── */
-    #logo {
-        content-align: center middle;
-        color: #da7756;
-        text-style: bold;
-        padding: 1 4 0 4;
-        height: 2;
-    }
-    #tagline {
-        content-align: center middle;
-        color: #444444;
-        padding: 0 4 1 4;
-        height: 1;
-    }
-    #divider-top {
-        height: 1;
-        background: #252525;
-    }
+class PromptCraftApp(ctk.CTk):
 
-    /* ── messages ── */
-    #messages {
-        height: 1fr;
-        padding: 0 4;
-    }
-    .msg-label {
-        color: #464646;
-        height: auto;
-        padding: 1 0 0 0;
-    }
-    .msg-user {
-        background: #2c2c2c;
-        border: round #3a3a3a;
-        color: #ececec;
-        padding: 0 2;
-        margin: 0 0 0 20;
-        height: auto;
-    }
-    .msg-claude {
-        background: transparent;
-        color: #ececec;
-        padding: 0 2;
-        margin: 0 20 0 0;
-        height: auto;
-    }
-    .msg-claude Markdown {
-        background: transparent;
-        color: #ececec;
-    }
-    .msg-system {
-        color: #464646;
-        text-style: italic;
-        padding: 0 2;
-        height: auto;
-        content-align: center middle;
-    }
+    # palette
+    C_BG     = "#1a1a1a"
+    C_BG2    = "#242424"
+    C_DIVID  = "#252525"
+    C_TEXT   = "#ececec"
+    C_DIM    = "#464646"
+    C_ORANGE = "#da7756"
+    C_GOLD   = "#c8a830"
+    C_RED    = "#c84040"
+    C_BLUE   = "#6080c8"
 
-    /* ── input area ── */
-    #divider-bottom {
-        height: 1;
-        background: #252525;
-    }
-    #input-row {
-        height: auto;
-        padding: 1 4 0 4;
-        align: left middle;
-    }
-    #user-input {
-        width: 1fr;
-        background: #242424;
-        border: round #383838;
-        color: #ececec;
-    }
-    #user-input:focus {
-        border: round #da7756;
-    }
+    PLACEHOLDER = "Type your message… (Enter to send · Shift+Enter for new line)"
 
-    /* ── action buttons ── */
-    #buttons {
-        height: auto;
-        padding: 1 4 0 4;
-        align: left middle;
-    }
-    Button {
-        margin: 0 1 0 0;
-        min-width: 12;
-        border: none;
-        background: #242424;
-        color: #585858;
-    }
-    Button:hover {
-        background: #2e2e2e;
-        color: #dadada;
-    }
-    #btn-clear {
-        color: #7a6830;
-    }
-    #btn-clear:hover {
-        background: #26200e;
-        color: #c8a830;
-    }
-    #btn-exit {
-        color: #7a3030;
-    }
-    #btn-exit:hover {
-        background: #261414;
-        color: #c84040;
-    }
-    #btn-info {
-        color: #38507a;
-    }
-    #btn-info:hover {
-        background: #12182a;
-        color: #6080c8;
-    }
-    #btn-like {
-        color: #9a4a30;
-    }
-    #btn-like:hover {
-        background: #261810;
-        color: #da7756;
-    }
+    INFO_TEXT = (
+        "/info       Show this help\n"
+        "/clear      Start a new conversation\n"
+        "ca          Copy Claude's last answer\n"
+        "cq          Copy your last question\n"
+        "Enter       Send message\n"
+        "Shift+Enter New line in input\n"
+        "♥ Like      Extract rules from last answer\n"
+    )
 
-    /* ── copy cards ── */
-    #cards {
-        height: 5;
-        padding: 1 4 1 4;
-    }
-    CopyCard {
-        height: 4;
-        padding: 0 2;
-        border: round #2e2e2e;
-        background: #212121;
-        color: #484848;
-    }
-    CopyCard:hover {
-        border: round #3a3a3a;
-        color: #dadada;
-    }
-    #card-question {
-        width: 1fr;
-        margin: 0 1 0 0;
-        border: round #3a2e1c;
-        color: #7a5e38;
-    }
-    #card-question:hover {
-        border: round #da7756;
-        color: #da9870;
-        background: #201610;
-    }
-    #card-answer {
-        width: 1fr;
-        border: round #22263a;
-        color: #3c4468;
-    }
-    #card-answer:hover {
-        border: round #4a5898;
-        color: #7888c8;
-        background: #101420;
-    }
-    """
-
-    TITLE = "PromptCraft"
-
-    INFO = """\
-[bold cyan]/info[/bold cyan]      Show this help message
-
-[bold cyan]/clear[/bold cyan]     Start a new conversation — wipes history and resets the session
-
-[bold cyan]ca[/bold cyan]         Copy Claude's last answer to the clipboard
-
-[bold cyan]cq[/bold cyan]         Copy your last question to the clipboard
-
-[bold cyan]Question[/bold cyan]   Card (bottom left)  — click to copy your last question
-
-[bold cyan]Answer[/bold cyan]     Card (bottom right) — click to copy Claude's last answer
-
-[bold cyan]↺ Clear[/bold cyan]    Button — same as typing [bold cyan]/clear[/bold cyan]
-
-[bold cyan]✕ Exit[/bold cyan]     Button — close the application
-
-[bold cyan]ℹ Info[/bold cyan]     Button — show this help
-
-[bold cyan]♥ Like[/bold cyan]     Button — analyze Claude's last answer and extract rules into the system prompt
-
-[dim]Anything else is sent to Claude as a message.[/dim]\
-"""
-
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self._session_started = False
-        self._last_reply      = ""
-        self._last_question   = ""
-        self._msg_count       = 0
-        self._rules           = load_rules()
+        self.title("PromptCraft")
+        self.geometry("960x720")
+        self.minsize(640, 480)
+        self.configure(fg_color=self.C_BG)
+
+        try:
+            self.iconbitmap(str(_base_dir() / "app.ico"))
+        except Exception:
+            pass
+
+        self._session_started  = False
+        self._last_reply       = ""
+        self._last_question    = ""
+        self._msg_count        = 0
+        self._rules            = load_rules()
+        self._input_locked     = False
+        self._placeholder_on   = True
+
+        self._build_ui()
+        self._input_box.focus_set()
 
     # ── layout ────────────────────────────────────────────────────────────────
 
-    def compose(self) -> ComposeResult:
-        yield Static("✦  PromptCraft", id="logo")
-        yield Static("craft prompts · chat with claude · copy answers", id="tagline")
-        yield Static("", id="divider-top")
-        yield VerticalScroll(id="messages")
-        yield Static("", id="divider-bottom")
-        with Horizontal(id="input-row"):
-            yield Input(
-                placeholder="Type your message and press Enter…",
-                id="user-input",
-            )
-        with Horizontal(id="buttons"):
-            yield Button("↺  Clear", id="btn-clear")
-            yield Button("✕  Exit",  id="btn-exit")
-            yield Button("ℹ  Info",  id="btn-info")
-            yield Button("♥  Like",  id="btn-like")
-        with Horizontal(id="cards"):
-            yield CopyCard("Question", card_id="card-question")
-            yield CopyCard("Answer",   card_id="card-answer")
+    def _build_ui(self) -> None:
+        # header
+        hdr = ctk.CTkFrame(self, fg_color=self.C_BG, corner_radius=0)
+        hdr.pack(fill="x", padx=24, pady=(12, 0))
+        ctk.CTkLabel(
+            hdr, text="✦  PromptCraft",
+            font=ctk.CTkFont(size=20, weight="bold"),
+            text_color=self.C_ORANGE,
+        ).pack()
+        ctk.CTkLabel(
+            hdr, text="craft prompts · chat with claude · copy answers",
+            font=ctk.CTkFont(size=11),
+            text_color=self.C_DIM,
+        ).pack()
 
-    def on_mount(self) -> None:
-        self.query_one("#user-input", Input).focus()
+        ctk.CTkFrame(self, height=1, fg_color=self.C_DIVID, corner_radius=0).pack(
+            fill="x", pady=(10, 0)
+        )
 
-    # ── message helpers ───────────────────────────────────────────────────────
+        # messages
+        self._msg_box = ctk.CTkTextbox(
+            self,
+            fg_color=self.C_BG,
+            text_color=self.C_TEXT,
+            font=ctk.CTkFont(family="Segoe UI", size=13),
+            wrap="word",
+            state="disabled",
+            corner_radius=0,
+            border_width=0,
+            activate_scrollbars=True,
+        )
+        self._msg_box.pack(fill="both", expand=True, padx=24, pady=(8, 0))
 
-    def _scroll_end(self):
-        self.query_one("#messages", VerticalScroll).scroll_end(animate=False)
+        tb = self._msg_box._textbox
+        tb.tag_config("user_lbl",   foreground=self.C_DIM)
+        tb.tag_config("claude_lbl", foreground=self.C_ORANGE)
+        tb.tag_config("user_msg",   foreground=self.C_TEXT, lmargin1=20, lmargin2=20)
+        tb.tag_config("claude_msg", foreground=self.C_TEXT)
+        tb.tag_config("system",     foreground=self.C_DIM,
+                      font=("Segoe UI", 11, "italic"))
+        tb.tag_config("error",      foreground=self.C_RED)
 
-    def _append(self, *widgets) -> None:
-        container = self.query_one("#messages", VerticalScroll)
-        for w in widgets:
-            container.mount(w)
-        self._scroll_end()
+        ctk.CTkFrame(self, height=1, fg_color=self.C_DIVID, corner_radius=0).pack(
+            fill="x", pady=(6, 0)
+        )
 
-    def _system(self, text: str) -> None:
-        self._append(Static(text, classes="msg-system"))
+        # input
+        inp_wrap = ctk.CTkFrame(self, fg_color=self.C_BG, corner_radius=0)
+        inp_wrap.pack(fill="x", padx=24, pady=(8, 0))
 
-    # ── input handler ─────────────────────────────────────────────────────────
+        self._input_box = ctk.CTkTextbox(
+            inp_wrap,
+            height=72,
+            fg_color=self.C_BG2,
+            text_color=self.C_DIM,
+            font=ctk.CTkFont(family="Segoe UI", size=13),
+            border_color="#383838",
+            border_width=1,
+            corner_radius=8,
+            wrap="word",
+        )
+        self._input_box.pack(fill="x")
+        self._input_box.insert("0.0", self.PLACEHOLDER)
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        text = event.value.strip()
+        self._input_box.bind("<FocusIn>",     self._ph_clear)
+        self._input_box.bind("<FocusOut>",    self._ph_restore)
+        self._input_box.bind("<Shift-Return>", self._on_shift_enter)
+        self._input_box.bind("<Return>",       self._on_enter)
+
+        ctk.CTkLabel(
+            inp_wrap,
+            text="Enter → send  ·  Shift+Enter → new line",
+            font=ctk.CTkFont(size=10),
+            text_color=self.C_DIM,
+        ).pack(anchor="e", pady=(2, 0))
+
+        # buttons
+        btn_wrap = ctk.CTkFrame(self, fg_color=self.C_BG, corner_radius=0)
+        btn_wrap.pack(fill="x", padx=24, pady=(8, 0))
+
+        base = dict(
+            width=92, height=30, corner_radius=6, border_width=0,
+            fg_color=self.C_BG2, hover_color="#2e2e2e",
+            font=ctk.CTkFont(size=12),
+        )
+        ctk.CTkButton(btn_wrap, text="↺  Clear", text_color=self.C_GOLD,
+                      command=self._do_clear, **base).pack(side="left", padx=(0, 6))
+        ctk.CTkButton(btn_wrap, text="✕  Exit",  text_color=self.C_RED,
+                      command=self.destroy, **base).pack(side="left", padx=(0, 6))
+        ctk.CTkButton(btn_wrap, text="ℹ  Info",  text_color=self.C_BLUE,
+                      command=self._show_info, **base).pack(side="left", padx=(0, 6))
+        ctk.CTkButton(btn_wrap, text="♥  Like",  text_color=self.C_ORANGE,
+                      command=self._like_answer, **base).pack(side="left", padx=(0, 6))
+        ctk.CTkButton(
+            btn_wrap, text="➤  Send", text_color=self.C_ORANGE,
+            fg_color="#2a1a10", hover_color="#3a2010",
+            font=ctk.CTkFont(size=12), width=80, height=30,
+            corner_radius=6, border_width=0,
+            command=self._send,
+        ).pack(side="right")
+
+        # copy cards
+        cards = ctk.CTkFrame(self, fg_color=self.C_BG, corner_radius=0)
+        cards.pack(fill="x", padx=24, pady=(8, 14))
+        cards.columnconfigure(0, weight=1)
+        cards.columnconfigure(1, weight=1)
+
+        self._card_q = ctk.CTkButton(
+            cards, text="Question\n—",
+            fg_color="#212121", hover_color="#201610",
+            text_color="#7a5e38", font=ctk.CTkFont(size=11),
+            height=52, corner_radius=8,
+            border_width=1, border_color="#3a2e1c",
+            command=lambda: self._copy(self._last_question, "Question"),
+        )
+        self._card_q.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+
+        self._card_a = ctk.CTkButton(
+            cards, text="Answer\n—",
+            fg_color="#212121", hover_color="#101420",
+            text_color="#3c4468", font=ctk.CTkFont(size=11),
+            height=52, corner_radius=8,
+            border_width=1, border_color="#22263a",
+            command=lambda: self._copy(self._last_reply, "Answer"),
+        )
+        self._card_a.grid(row=0, column=1, sticky="ew")
+
+    # ── placeholder ───────────────────────────────────────────────────────────
+
+    def _ph_clear(self, _=None) -> None:
+        if self._placeholder_on:
+            self._input_box.delete("0.0", "end")
+            self._input_box.configure(text_color=self.C_TEXT)
+            self._placeholder_on = False
+
+    def _ph_restore(self, _=None) -> None:
+        if not self._input_box.get("0.0", "end").strip():
+            self._input_box.configure(text_color=self.C_DIM)
+            self._input_box.insert("0.0", self.PLACEHOLDER)
+            self._placeholder_on = True
+
+    def _get_input(self) -> str:
+        if self._placeholder_on:
+            return ""
+        return self._input_box.get("0.0", "end").strip()
+
+    def _clear_input(self) -> None:
+        self._input_box.delete("0.0", "end")
+        self._placeholder_on = False
+
+    # ── key bindings ──────────────────────────────────────────────────────────
+
+    def _on_enter(self, event) -> str:
+        self._send()
+        return "break"
+
+    def _on_shift_enter(self, event) -> str:
+        self._input_box._textbox.insert("insert", "\n")
+        return "break"
+
+    # ── send ──────────────────────────────────────────────────────────────────
+
+    def _send(self) -> None:
+        if self._input_locked:
+            return
+        text = self._get_input()
         if not text:
             return
-        event.input.clear()
+        self._clear_input()
 
         if text.lower() == "/info":
-            self._append(Static(self.INFO, classes="msg-system"))
+            self._append_system(self.INFO_TEXT)
             return
-
+        if text.lower() == "/clear":
+            self._do_clear()
+            return
         if text.lower() == "ca":
             self._copy(self._last_reply, "Answer")
             return
-
         if text.lower() == "cq":
             self._copy(self._last_question, "Question")
             return
 
-        if text.lower() == "/clear":
-            self._do_clear()
-            return
-
         self._msg_count    += 1
         self._last_question = text
-        n = self._msg_count
+        preview = text[:50] + ("…" if len(text) > 50 else "")
+        self._card_q.configure(text=f"Question\n{preview}")
 
-        self.query_one("#card-question", CopyCard).set_content(text)
+        self._append_user(text)
+        self._start_thinking()
 
-        self._append(
-            Static(
-                f"[#ececec]You[/#ececec]  [#464646]{ts()}[/#464646]",
-                classes="msg-label",
-            ),
-            Static(text, classes="msg-user"),
-            Static("  [#464646]···  Thinking…[/#464646]", classes="msg-system", id="thinking"),
-        )
+        self._input_locked = True
+        self._input_box.configure(state="disabled")
+        threading.Thread(target=self._call_claude, args=(text,), daemon=True).start()
 
-        self.query_one("#user-input", Input).disabled = True
-        self._call_claude(text, n)
+    # ── message display ───────────────────────────────────────────────────────
+
+    def _write(self, text: str, tag: str = "") -> None:
+        self._msg_box.configure(state="normal")
+        self._msg_box._textbox.insert("end", text, tag)
+        self._msg_box.configure(state="disabled")
+        self._msg_box.see("end")
+
+    def _append_user(self, text: str) -> None:
+        self._write(f"\nYou  {ts()}\n", "user_lbl")
+        self._write(text + "\n", "user_msg")
+
+    def _start_thinking(self) -> None:
+        tb = self._msg_box._textbox
+        self._msg_box.configure(state="normal")
+        tb.mark_set("thinking_start", "end")
+        tb.mark_gravity("thinking_start", "left")
+        self._msg_box.configure(state="disabled")
+        self._write("\n···  Thinking…\n", "system")
+
+    def _finish_thinking(self) -> None:
+        try:
+            self._msg_box.configure(state="normal")
+            self._msg_box._textbox.delete("thinking_start", "end")
+            self._msg_box.configure(state="disabled")
+        except Exception:
+            pass
+
+    def _append_claude(self, text: str, success: bool) -> None:
+        self._write(f"\n✦  Claude  {ts()}\n", "claude_lbl")
+        if success:
+            self._write(text + "\n", "claude_msg")
+        else:
+            self._write("Error: " + text + "\n", "error")
+
+    def _append_system(self, text: str) -> None:
+        self._write("\n" + text + "\n", "system")
 
     # ── Claude worker ─────────────────────────────────────────────────────────
 
-    @work(thread=True)
-    def _call_claude(self, message: str, n: int) -> None:
+    def _call_claude(self, message: str) -> None:
         cmd = ["claude", "-p", message, "--model", CHAT_MODEL, "--output-format", "text"]
         if self._session_started:
             cmd.append("--continue")
@@ -438,222 +388,90 @@ class PromptCraftApp(App):
         try:
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
-                reply   = result.stderr.strip() or "Unknown error"
-                success = False
+                reply, success = result.stderr.strip() or "Unknown error", False
             else:
-                reply   = result.stdout.strip()
-                success = True
+                reply, success = result.stdout.strip(), True
         except Exception as exc:
-            reply   = str(exc)
-            success = False
+            reply, success = str(exc), False
 
-        self.call_from_thread(self._on_reply, reply, n, success)
+        self.after(0, self._on_reply, reply, success)
 
-    def _on_reply(self, reply: str, n: int, success: bool) -> None:
-        try:
-            self.query_one("#thinking").remove()
-        except Exception:
-            pass
+    def _on_reply(self, reply: str, success: bool) -> None:
+        self._finish_thinking()
 
         if success:
             self._session_started = True
             self._last_reply      = reply
-            self.query_one("#card-answer", CopyCard).set_content(reply)
+            preview = reply[:50] + ("…" if len(reply) > 50 else "")
+            self._card_a.configure(text=f"Answer\n{preview}")
 
-        label = Static(
-            f"[#da7756]✦[/#da7756]  [#ececec]Claude[/#ececec]  [#464646]{ts()}[/#464646]",
-            classes="msg-label",
-        )
-        msg = Markdown(reply, classes="msg-claude") if success else \
-              Static(f"[red]Error:[/red] {reply}", classes="msg-claude")
+        self._append_claude(reply, success)
 
-        self._append(label, msg)
-
-        inp = self.query_one("#user-input", Input)
-        inp.disabled = False
-        inp.focus()
+        self._input_locked = False
+        self._input_box.configure(state="normal")
+        self._input_box.focus_set()
 
     # ── like / rule extraction ────────────────────────────────────────────────
 
     def _like_answer(self) -> None:
         if not self._last_reply:
-            self._system("  Nothing to like yet")
+            self._append_system("  Nothing to like yet")
             return
-        self._system("  ♥  Analyzing answer — extracting rules…")
-        self._extract_rules(self._last_reply)
+        self._append_system("  ♥  Analyzing answer — extracting rules…")
+        threading.Thread(
+            target=self._extract_rules, args=(self._last_reply,), daemon=True
+        ).start()
 
-    @work(thread=True)
     def _extract_rules(self, answer: str) -> None:
         prompt = ANALYZE_PROMPT.format(answer=answer)
         result = subprocess.run(
             ["claude", "-p", prompt, "--model", CHAT_MODEL, "--output-format", "text"],
             capture_output=True, text=True,
         )
-        if result.returncode == 0:
-            rules = result.stdout.strip()
-        else:
-            rules = ""
-        self.call_from_thread(self._on_rules_saved, rules)
+        rules = result.stdout.strip() if result.returncode == 0 else ""
+        self.after(0, self._on_rules_saved, rules)
 
     def _on_rules_saved(self, rules: str) -> None:
         if not rules:
-            self._system("  ✗  Could not extract rules — try again")
+            self._append_system("  ✗  Could not extract rules — try again")
             return
         append_rules(rules)
         self._rules = load_rules()
-        self._system(
-            f"  ✓  Rules learned and saved:\n"
-            + "\n".join(f"     {line}" for line in rules.splitlines())
-        )
+        lines = "\n".join(f"     {line}" for line in rules.splitlines())
+        self._append_system(f"  ✓  Rules learned and saved:\n{lines}")
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
     def _copy(self, text: str, label: str) -> None:
         if not text:
-            self._system(f"  Nothing to copy yet")
+            self._append_system("  Nothing to copy yet")
             return
         try:
             pyperclip.copy(text)
-            self._system(f"  ✓  {label} copied to clipboard")
+            self._append_system(f"  ✓  {label} copied to clipboard")
         except Exception:
-            self._system("  ✗  Copy failed — clipboard not available")
+            self._append_system("  ✗  Copy failed — clipboard not available")
 
     def _do_clear(self) -> None:
         self._session_started = False
         self._last_reply      = ""
         self._last_question   = ""
         self._msg_count       = 0
-        self.query_one("#messages", VerticalScroll).remove_children()
-        self.query_one("#card-question", CopyCard).set_content("")
-        self.query_one("#card-answer",   CopyCard).set_content("")
-        self._system("  ↺  Conversation cleared")
-        self.query_one("#user-input", Input).focus()
+        self._msg_box.configure(state="normal")
+        self._msg_box.delete("0.0", "end")
+        self._msg_box.configure(state="disabled")
+        self._card_q.configure(text="Question\n—")
+        self._card_a.configure(text="Answer\n—")
+        self._append_system("  ↺  Conversation cleared")
+        self._ph_restore()
+        self._input_box.focus_set()
 
-    # ── button handler ────────────────────────────────────────────────────────
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        bid = event.button.id
-        if   bid == "btn-clear": self._do_clear()
-        elif bid == "btn-info":  self._append(Static(self.INFO, classes="msg-system"))
-        elif bid == "btn-exit":  self.exit()
-        elif bid == "btn-like":  self._like_answer()
-
-
-# ── console font ─────────────────────────────────────────────────────────────
-
-class _COORD(ctypes.Structure):
-    _fields_ = [("X", ctypes.c_short), ("Y", ctypes.c_short)]
-
-class _CONSOLE_FONT_INFOEX(ctypes.Structure):
-    _fields_ = [
-        ("cbSize",      ctypes.wintypes.ULONG),
-        ("nFont",       ctypes.wintypes.DWORD),
-        ("dwFontSize",  _COORD),
-        ("FontFamily",  ctypes.wintypes.UINT),
-        ("FontWeight",  ctypes.wintypes.UINT),
-        ("FaceName",    ctypes.c_wchar * 32),
-    ]
-
-def set_console_font_size(pt: int) -> None:
-    try:
-        handle = ctypes.windll.kernel32.GetStdHandle(ctypes.wintypes.DWORD(-11))
-        font = _CONSOLE_FONT_INFOEX()
-        font.cbSize = ctypes.sizeof(_CONSOLE_FONT_INFOEX)
-        ctypes.windll.kernel32.GetCurrentConsoleFontEx(handle, False, ctypes.byref(font))
-        font.dwFontSize.X = 0
-        font.dwFontSize.Y = pt
-        ctypes.windll.kernel32.SetCurrentConsoleFontEx(handle, False, ctypes.byref(font))
-    except Exception:
-        pass
-
-
-# ── taskbar icon ─────────────────────────────────────────────────────────────
-
-def _make_app_icon() -> None:
-    """Write app.ico (32×32 RGBA PNG-in-ICO) next to the exe/script if absent.
-
-    Design: six-spoke asterisk in Claude orange (#da7756) on dark (#1a1a1a).
-    Uses only stdlib — no Pillow required.
-    """
-    try:
-        import math, struct, zlib
-
-        ico_path = _base_dir() / "app.ico"
-        if ico_path.exists():
-            return
-
-        SIZE   = 32
-        BG     = (0x1a, 0x1a, 0x1a, 0xff)
-        FG     = (0xda, 0x77, 0x56, 0xff)
-        cx = cy = SIZE / 2
-        R_MAX   = 13.5
-        R_MIN   = 2.8
-        HALF_W  = 2.1
-        SPOKES  = 6
-
-        pixels = []
-        for y in range(SIZE):
-            row = []
-            for x in range(SIZE):
-                dx, dy = x - cx + 0.5, y - cy + 0.5
-                r = math.hypot(dx, dy)
-                color = BG
-                if R_MIN <= r <= R_MAX:
-                    for i in range(SPOKES):
-                        a = math.pi * i / SPOKES
-                        perp = abs(-dx * math.sin(a) + dy * math.cos(a))
-                        if perp < HALF_W:
-                            color = FG
-                            break
-                row.append(color)
-            pixels.append(row)
-
-        def _chunk(tag: bytes, data: bytes) -> bytes:
-            body = tag + data
-            return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
-
-        ihdr = struct.pack(">II", SIZE, SIZE) + bytes([8, 6, 0, 0, 0])
-        raw  = b"".join(b"\x00" + bytes(c for px in row for c in px) for row in pixels)
-        png  = (
-            b"\x89PNG\r\n\x1a\n"
-            + _chunk(b"IHDR", ihdr)
-            + _chunk(b"IDAT", zlib.compress(raw))
-            + _chunk(b"IEND", b"")
-        )
-        ico = (
-            struct.pack("<HHH", 0, 1, 1)
-            + struct.pack("<BBBBHHII", SIZE, SIZE, 0, 0, 1, 32, len(png), 22)
-            + png
-        )
-        ico_path.write_bytes(ico)
-    except Exception:
-        pass
-
-
-def _set_taskbar_icon() -> None:
-    """Load app.ico and apply it to the console window (small + large slots)."""
-    try:
-        ico_path = str(_base_dir() / "app.ico")
-        hIcon = ctypes.windll.user32.LoadImageW(
-            None, ico_path,
-            1,           # IMAGE_ICON
-            0, 0,
-            0x10,        # LR_LOADFROMFILE
-        )
-        if not hIcon:
-            return
-        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-        if hwnd:
-            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, hIcon)   # ICON_SMALL
-            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, hIcon)   # ICON_BIG
-    except Exception:
-        pass
+    def _show_info(self) -> None:
+        self._append_system(self.INFO_TEXT)
 
 
 # ── entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    set_console_font_size(16)
-    _make_app_icon()
-    _set_taskbar_icon()
-    PromptCraftApp().run()
+    app = PromptCraftApp()
+    app.mainloop()
