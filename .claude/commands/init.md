@@ -1,79 +1,26 @@
-Initialize the Claude Code configuration for this PromptCraft project on this machine.
+Initialize the global Claude Code configuration for this machine.
 
 Perform the following steps in order:
 
-## 1. Verify project structure
+## 1. Verify hooks directory
+Check that `~/.claude/hooks/` exists. If not, create it.
 
-Check that the following directories exist under `.claude/`. Create any that are missing:
-- `.claude/commands/`
-- `.claude/hooks/`
+## 2. Verify hook scripts
+Check that all required hook scripts exist in `~/.claude/hooks/`:
+- `pre-guard.sh`
+- `post-format.sh`
+- `post-audit-log.sh`
+- `stop-build-and-fix.sh`
+- `stop-git-autocommit.sh`
+- `stop-notify.sh`
 
-## 2. Verify commands
-
-Check that `.claude/commands/craft.md` exists.
-If it is missing, tell the user — this file is the core `/craft` slash command and must be restored from version control.
+If any are missing, read the corresponding file from the current repo's `.claude/hooks/` directory and write it to `~/.claude/hooks/`.
 
 ## 3. Verify settings.json
+Check that `~/.claude/settings.json` exists and contains the `hooks` key wiring all the scripts above. If missing or incomplete, copy from this repo's `.claude/settings.json`.
 
-Check that `.claude/settings.json` exists and is valid JSON.
-If the file is missing or empty, write the following default content to it:
-
-```json
-{
-  "permissions": {
-    "allow": [],
-    "deny": [
-      "Bash(git push --force*)",
-      "Bash(git push -f*)",
-      "Bash(git reset --hard*)",
-      "Bash(git clean -f*)",
-      "Bash(git clean -fd*)",
-      "Bash(git checkout -- *)",
-      "Bash(git restore .)",
-      "Bash(git branch -D*)",
-      "Bash(git rebase -i*)",
-      "Bash(git commit --amend*)",
-      "Bash(git reflog delete*)"
-    ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/hooks/ensure-git-hooks.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Do not overwrite an existing non-empty `settings.json`.
-
-## 4. Install git hooks
-
-Check if `.git/hooks/prepare-commit-msg` exists.
-If it does not, copy `.claude/hooks/prepare-commit-msg` to `.git/hooks/prepare-commit-msg` and make it executable:
-
-```sh
-cp .claude/hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
-chmod +x .git/hooks/prepare-commit-msg
-```
+## 4. Verify ANTHROPIC_API_KEY
+Check if `ANTHROPIC_API_KEY` is set in the environment. If not, remind the user to add it to their shell profile (`~/.bashrc` or `~/.zshrc`) — it is required for AI-generated commit messages and auto build-fix.
 
 ## 5. Report
-
-Print a concise summary table:
-
-| Item | Status |
-|---|---|
-| `.claude/commands/` | ✓ exists / ✗ created |
-| `.claude/hooks/` | ✓ exists / ✗ created |
-| `.claude/commands/craft.md` | ✓ exists / ✗ missing |
-| `.claude/settings.json` | ✓ valid / ✗ written default / ✗ missing |
-| `.git/hooks/prepare-commit-msg` | ✓ installed / ✗ installed now |
-
-List any manual steps the user still needs to take.
+Print a summary table of what was already present, what was created, and what still needs manual action.

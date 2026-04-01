@@ -1,8 +1,4 @@
 {
-  "permissions": {
-    "allow": [],
-    "deny": []
-  },
   "hooks": {
     "PreToolUse": [
       {
@@ -10,11 +6,58 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/git-guard.sh"
+            "command": "bash ~/.claude/hooks/pre-guard.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/post-format.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/post-secret-scan.sh"
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/ensure-git-hooks.sh"
+            "command": "bash ~/.claude/hooks/post-dotnet-security-scan.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/post-react-security-scan.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/post-audit-log.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/stop-build-and-fix.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/stop-git-autocommit.sh"
           }
         ]
       }
