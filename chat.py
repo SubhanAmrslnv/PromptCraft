@@ -24,7 +24,14 @@ SYSTEM_PROMPT_BASE = (
     "Be direct and concise."
 )
 
-RULES_FILE = Path(__file__).parent / "rules.md"
+def _base_dir() -> Path:
+    """Folder next to the exe when frozen, or next to this script in dev."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+    return Path(__file__).parent
+
+
+RULES_FILE = _base_dir() / "rules.md"
 
 ANALYZE_PROMPT = (
     "Analyze the following assistant answer. "
@@ -535,68 +542,70 @@ def set_console_font_size(pt: int) -> None:
 # ── taskbar icon ─────────────────────────────────────────────────────────────
 
 def _make_app_icon() -> None:
-    """Write app.ico (32×32 RGBA PNG-in-ICO) next to this script if absent.
+    """Write app.ico (32×32 RGBA PNG-in-ICO) next to the exe/script if absent.
 
     Design: six-spoke asterisk in Claude orange (#da7756) on dark (#1a1a1a).
     Uses only stdlib — no Pillow required.
     """
-    import math, struct, zlib
+    try:
+        import math, struct, zlib
 
-    ico_path = Path(__file__).parent / "app.ico"
-    if ico_path.exists():
-        return
+        ico_path = _base_dir() / "app.ico"
+        if ico_path.exists():
+            return
 
-    SIZE   = 32
-    BG     = (0x1a, 0x1a, 0x1a, 0xff)
-    FG     = (0xda, 0x77, 0x56, 0xff)
-    cx = cy = SIZE / 2
-    R_MAX   = 13.5
-    R_MIN   = 2.8
-    HALF_W  = 2.1
-    SPOKES  = 6
+        SIZE   = 32
+        BG     = (0x1a, 0x1a, 0x1a, 0xff)
+        FG     = (0xda, 0x77, 0x56, 0xff)
+        cx = cy = SIZE / 2
+        R_MAX   = 13.5
+        R_MIN   = 2.8
+        HALF_W  = 2.1
+        SPOKES  = 6
 
-    pixels = []
-    for y in range(SIZE):
-        row = []
-        for x in range(SIZE):
-            dx, dy = x - cx + 0.5, y - cy + 0.5
-            r = math.hypot(dx, dy)
-            color = BG
-            if R_MIN <= r <= R_MAX:
-                for i in range(SPOKES):
-                    a = math.pi * i / SPOKES
-                    perp = abs(-dx * math.sin(a) + dy * math.cos(a))
-                    if perp < HALF_W:
-                        color = FG
-                        break
-            row.append(color)
-        pixels.append(row)
+        pixels = []
+        for y in range(SIZE):
+            row = []
+            for x in range(SIZE):
+                dx, dy = x - cx + 0.5, y - cy + 0.5
+                r = math.hypot(dx, dy)
+                color = BG
+                if R_MIN <= r <= R_MAX:
+                    for i in range(SPOKES):
+                        a = math.pi * i / SPOKES
+                        perp = abs(-dx * math.sin(a) + dy * math.cos(a))
+                        if perp < HALF_W:
+                            color = FG
+                            break
+                row.append(color)
+            pixels.append(row)
 
-    def _chunk(tag: bytes, data: bytes) -> bytes:
-        body = tag + data
-        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+        def _chunk(tag: bytes, data: bytes) -> bytes:
+            body = tag + data
+            return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
 
-    ihdr = struct.pack(">II", SIZE, SIZE) + bytes([8, 6, 0, 0, 0])
-    raw  = b"".join(b"\x00" + bytes(c for px in row for c in px) for row in pixels)
-    png  = (
-        b"\x89PNG\r\n\x1a\n"
-        + _chunk(b"IHDR", ihdr)
-        + _chunk(b"IDAT", zlib.compress(raw))
-        + _chunk(b"IEND", b"")
-    )
-
-    ico = (
-        struct.pack("<HHH", 0, 1, 1)
-        + struct.pack("<BBBBHHII", SIZE, SIZE, 0, 0, 1, 32, len(png), 22)
-        + png
-    )
-    ico_path.write_bytes(ico)
+        ihdr = struct.pack(">II", SIZE, SIZE) + bytes([8, 6, 0, 0, 0])
+        raw  = b"".join(b"\x00" + bytes(c for px in row for c in px) for row in pixels)
+        png  = (
+            b"\x89PNG\r\n\x1a\n"
+            + _chunk(b"IHDR", ihdr)
+            + _chunk(b"IDAT", zlib.compress(raw))
+            + _chunk(b"IEND", b"")
+        )
+        ico = (
+            struct.pack("<HHH", 0, 1, 1)
+            + struct.pack("<BBBBHHII", SIZE, SIZE, 0, 0, 1, 32, len(png), 22)
+            + png
+        )
+        ico_path.write_bytes(ico)
+    except Exception:
+        pass
 
 
 def _set_taskbar_icon() -> None:
     """Load app.ico and apply it to the console window (small + large slots)."""
     try:
-        ico_path = str(Path(__file__).parent / "app.ico")
+        ico_path = str(_base_dir() / "app.ico")
         hIcon = ctypes.windll.user32.LoadImageW(
             None, ico_path,
             1,           # IMAGE_ICON
