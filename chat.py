@@ -1,27 +1,20 @@
 #!/usr/bin/env python3
-"""PromptCraft Chat — terminal UI powered by the local `claude` CLI."""
+"""PromptCraft Chat — Textual TUI with clickable buttons."""
 
 import subprocess
 import sys
 from datetime import datetime
 
 try:
-    from rich.console import Console
-    from rich.markdown import Markdown
-    from rich.panel import Panel
-    from rich.prompt import Prompt
-    from rich.text import Text
-    from rich.align import Align
-    from rich.rule import Rule
-    from rich import box
+    from textual.app import App, ComposeResult
+    from textual.widgets import Static, Input, Button, VerticalScroll, Markdown
+    from textual.containers import Horizontal, Vertical
+    from textual import work
     import pyperclip
     import pyfiglet
 except ImportError:
-    print("Missing dependencies. Run:  pip install rich pyperclip pyfiglet")
+    print("Missing dependencies. Run:  pip install textual pyperclip pyfiglet")
     sys.exit(1)
-
-console = Console()
-_session_started = False
 
 SYSTEM_PROMPT = (
     "Answer only what the user asks. "
@@ -29,188 +22,317 @@ SYSTEM_PROMPT = (
     "Be direct and concise."
 )
 
-LOGO_FONT  = "slant"
-ACCENT     = "cyan"
-USER_COLOR = "green"
-BOT_COLOR  = "bright_blue"
-DIM        = "grey50"
+
+def make_logo() -> str:
+    try:
+        return pyfiglet.figlet_format("PromptCraft", font="slant")
+    except Exception:
+        return "  PromptCraft\n"
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
-
-def now() -> str:
+def ts() -> str:
     return datetime.now().strftime("%H:%M")
 
 
-def ask_claude(message: str) -> str:
-    global _session_started
-    cmd = ["claude", "-p", message, "--output-format", "text"]
-    if _session_started:
-        cmd.append("--continue")
-    else:
-        cmd += ["--append-system-prompt", SYSTEM_PROMPT]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or "unknown error")
-    _session_started = True
-    return result.stdout.strip()
+# ── App ───────────────────────────────────────────────────────────────────────
 
+class PromptCraftApp(App):
 
-def reset_session():
-    global _session_started
-    _session_started = False
+    CSS = """
+    Screen {
+        background: #0c0c0c;
+        layers: base;
+    }
 
+    /* ── header ── */
+    #logo {
+        content-align: center middle;
+        color: cyan;
+        text-style: bold;
+        padding: 1 4 0 4;
+        height: auto;
+    }
+    #tagline {
+        content-align: center middle;
+        color: grey35;
+        padding: 0 4 1 4;
+        height: auto;
+    }
+    #divider-top {
+        height: 1;
+        background: grey15;
+    }
 
-def copy_to_clipboard(text: str, label: str):
-    try:
-        pyperclip.copy(text)
-        console.print(f"\n  [{DIM}]✓ {label} copied to clipboard.[/{DIM}]\n")
-    except Exception:
-        console.print(f"\n  [red]✗ Copy failed — clipboard not available.[/red]\n")
+    /* ── messages ── */
+    #messages {
+        height: 1fr;
+        padding: 0 3;
+    }
+    .msg-label {
+        color: grey35;
+        height: auto;
+        padding: 1 0 0 0;
+    }
+    .msg-user {
+        background: #0b1f10;
+        border: round #245530;
+        color: #7be08a;
+        padding: 0 2;
+        margin: 0 12 0 0;
+        height: auto;
+    }
+    .msg-claude {
+        background: #090f1e;
+        border: round #1a3a5c;
+        color: bright_white;
+        padding: 0 2;
+        margin: 0 0 0 12;
+        height: auto;
+    }
+    .msg-claude Markdown {
+        background: transparent;
+        color: bright_white;
+    }
+    .msg-system {
+        color: grey35;
+        text-style: italic;
+        padding: 0 2;
+        height: auto;
+        content-align: center middle;
+    }
 
+    /* ── input area ── */
+    #divider-bottom {
+        height: 1;
+        background: grey15;
+    }
+    #input-row {
+        height: auto;
+        padding: 1 3 0 3;
+        align: left middle;
+    }
+    #user-input {
+        width: 1fr;
+        background: #161616;
+        border: round grey30;
+        color: white;
+    }
+    #user-input:focus {
+        border: round cyan;
+    }
 
-# ── layout ────────────────────────────────────────────────────────────────────
+    /* ── buttons ── */
+    #buttons {
+        height: auto;
+        padding: 1 3 1 3;
+        align: left middle;
+    }
+    Button {
+        margin: 0 1 0 0;
+        min-width: 18;
+        border: tall grey30;
+        background: #161616;
+        color: grey50;
+    }
+    Button:hover {
+        text-style: bold;
+    }
+    #btn-copy-answer {
+        border: tall #1e5c78;
+        background: #071520;
+        color: #4aaccc;
+    }
+    #btn-copy-answer:hover {
+        background: #0d2535;
+        color: bright_cyan;
+    }
+    #btn-copy-question {
+        border: tall #1e5830;
+        background: #071508;
+        color: #4acc70;
+    }
+    #btn-copy-question:hover {
+        background: #0d2812;
+        color: bright_green;
+    }
+    #btn-clear {
+        border: tall #5c5010;
+        background: #151200;
+        color: #ccb840;
+    }
+    #btn-clear:hover {
+        background: #252200;
+        color: bright_yellow;
+    }
+    #btn-exit {
+        border: tall #5c1a1a;
+        background: #150505;
+        color: #cc4444;
+    }
+    #btn-exit:hover {
+        background: #250808;
+        color: bright_red;
+    }
+    """
 
-def draw_logo():
-    try:
-        art = pyfiglet.figlet_format("PromptCraft", font=LOGO_FONT)
-    except Exception:
-        art = "  PromptCraft\n"
+    TITLE = "PromptCraft"
 
-    lines = art.splitlines()
-    text = Text()
-    colors = ["cyan", "cyan", "bright_cyan", "bright_cyan", "cyan", "cyan"]
-    for i, line in enumerate(lines):
-        color = colors[i % len(colors)]
-        text.append(line + "\n", style=f"bold {color}")
+    def __init__(self):
+        super().__init__()
+        self._session_started = False
+        self._last_reply      = ""
+        self._last_question   = ""
+        self._msg_count       = 0
 
-    console.print(Align.center(text))
-    console.print(
-        Align.center(Text("✦  craft prompts · chat with claude · copy answers  ✦", style=DIM))
-    )
-    console.print()
+    # ── layout ────────────────────────────────────────────────────────────────
 
+    def compose(self) -> ComposeResult:
+        yield Static(make_logo(), id="logo")
+        yield Static(
+            "✦  craft prompts · chat with claude · copy answers  ✦",
+            id="tagline",
+        )
+        yield Static("", id="divider-top")
+        yield VerticalScroll(id="messages")
+        yield Static("", id="divider-bottom")
+        with Horizontal(id="input-row"):
+            yield Input(
+                placeholder="Type your message and press Enter…",
+                id="user-input",
+            )
+        with Horizontal(id="buttons"):
+            yield Button("⎘  Copy Answer",   id="btn-copy-answer")
+            yield Button("⎘  Copy Question", id="btn-copy-question")
+            yield Button("↺  Clear Chat",    id="btn-clear")
+            yield Button("✕  Exit",          id="btn-exit")
 
-def draw_shortcuts():
-    bar = Text()
-    pairs = [
-        ("ca", "copy answer"),
-        ("cq", "copy question"),
-        ("clear", "new chat"),
-        ("exit", "quit"),
-    ]
-    for i, (key, desc) in enumerate(pairs):
-        if i:
-            bar.append("   ", style=DIM)
-        bar.append(f" {key} ", style=f"bold black on {ACCENT}")
-        bar.append(f" {desc}", style=DIM)
+    def on_mount(self) -> None:
+        self.query_one("#user-input", Input).focus()
 
-    console.print(Align.center(bar))
-    console.print()
-    console.print(Rule(style=DIM))
-    console.print()
+    # ── message helpers ───────────────────────────────────────────────────────
 
+    def _scroll_end(self):
+        self.query_one("#messages", VerticalScroll).scroll_end(animate=False)
 
-def header():
-    console.clear()
-    console.print()
-    draw_logo()
-    draw_shortcuts()
+    def _append(self, *widgets) -> None:
+        container = self.query_one("#messages", VerticalScroll)
+        for w in widgets:
+            container.mount(w)
+        self._scroll_end()
 
+    def _system(self, text: str) -> None:
+        self._append(Static(text, classes="msg-system"))
 
-def draw_user_message(text: str, n: int):
-    label = Text()
-    label.append(f"  #{n} ", style=DIM)
-    label.append("You", style=f"bold {USER_COLOR}")
-    label.append(f"  {now()}", style=DIM)
-    console.print(label)
-    console.print(Panel(
-        f"[{USER_COLOR}]{text}[/{USER_COLOR}]",
-        border_style=USER_COLOR,
-        box=box.ROUNDED,
-        padding=(0, 2),
-    ))
+    # ── input handler ─────────────────────────────────────────────────────────
 
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        text = event.value.strip()
+        if not text:
+            return
+        event.input.clear()
 
-def draw_claude_message(text: str, n: int):
-    label = Text()
-    label.append(f"  #{n} ", style=DIM)
-    label.append("Claude", style=f"bold {BOT_COLOR}")
-    label.append(f"  {now()}", style=DIM)
-    console.print(label)
-    console.print(Panel(
-        Markdown(text),
-        border_style=BOT_COLOR,
-        box=box.ROUNDED,
-        padding=(1, 2),
-    ))
-    console.print()
+        self._msg_count      += 1
+        self._last_question   = text
+        n = self._msg_count
 
+        self._append(
+            Static(
+                f"[grey35]#{n}[/grey35]  [bold green]You[/bold green]  [grey35]{ts()}[/grey35]",
+                classes="msg-label",
+            ),
+            Static(text, classes="msg-user"),
+            Static("  ···  Claude is thinking", classes="msg-system", id="thinking"),
+        )
 
-# ── main loop ─────────────────────────────────────────────────────────────────
+        self.query_one("#user-input", Input).disabled = True
+        self._call_claude(text, n)
 
-def run():
-    header()
+    # ── Claude worker ─────────────────────────────────────────────────────────
 
-    last_reply    = ""
-    last_question = ""
-    msg_count     = 0
+    @work(thread=True)
+    def _call_claude(self, message: str, n: int) -> None:
+        cmd = ["claude", "-p", message, "--output-format", "text"]
+        if self._session_started:
+            cmd.append("--continue")
+        else:
+            cmd += ["--append-system-prompt", SYSTEM_PROMPT]
 
-    while True:
         try:
-            user_input = Prompt.ask(
-                f"\n  [bold {USER_COLOR}]›[/bold {USER_COLOR}]"
-            ).strip()
-        except (KeyboardInterrupt, EOFError):
-            console.print(f"\n  [{DIM}]Goodbye.[/{DIM}]\n")
-            break
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                reply   = result.stderr.strip() or "Unknown error"
+                success = False
+            else:
+                reply   = result.stdout.strip()
+                success = True
+        except Exception as exc:
+            reply   = str(exc)
+            success = False
 
-        if not user_input:
-            continue
+        self.call_from_thread(self._on_reply, reply, n, success)
 
-        cmd = user_input.lower()
-
-        if cmd in ("exit", "quit", "q"):
-            console.print(f"\n  [{DIM}]Goodbye.[/{DIM}]\n")
-            break
-
-        if cmd == "clear":
-            reset_session()
-            last_reply = last_question = ""
-            msg_count  = 0
-            header()
-            continue
-
-        if cmd == "ca":
-            copy_to_clipboard(last_reply, "Answer") if last_reply else \
-                console.print(f"\n  [{DIM}]Nothing to copy yet.[/{DIM}]\n")
-            continue
-
-        if cmd == "cq":
-            copy_to_clipboard(last_question, "Question") if last_question else \
-                console.print(f"\n  [{DIM}]Nothing to copy yet.[/{DIM}]\n")
-            continue
-
-        msg_count    += 1
-        last_question = user_input
-
-        console.print()
-        draw_user_message(user_input, msg_count)
-        console.print()
-
+    def _on_reply(self, reply: str, n: int, success: bool) -> None:
         try:
-            with console.status(
-                f"  [{ACCENT}]Claude is thinking...[/{ACCENT}]", spinner="dots"
-            ):
-                reply = ask_claude(user_input)
-        except RuntimeError as exc:
-            console.print(f"  [red]Error:[/red] {exc}\n")
-            msg_count -= 1
-            continue
+            self.query_one("#thinking").remove()
+        except Exception:
+            pass
 
-        last_reply = reply
-        draw_claude_message(reply, msg_count)
+        if success:
+            self._session_started = True
+            self._last_reply      = reply
 
+        label = Static(
+            f"[grey35]#{n}[/grey35]  [bold bright_blue]Claude[/bold bright_blue]  [grey35]{ts()}[/grey35]",
+            classes="msg-label",
+        )
+        msg = Markdown(reply, classes="msg-claude") if success else \
+              Static(f"[red]Error:[/red] {reply}", classes="msg-claude")
+
+        self._append(label, msg)
+
+        inp = self.query_one("#user-input", Input)
+        inp.disabled = False
+        inp.focus()
+
+    # ── button handler ────────────────────────────────────────────────────────
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        bid = event.button.id
+
+        if bid == "btn-copy-answer":
+            if not self._last_reply:
+                self._system("  Nothing to copy yet")
+                return
+            try:
+                pyperclip.copy(self._last_reply)
+                self._system("  ✓  Answer copied to clipboard")
+            except Exception:
+                self._system("  ✗  Copy failed — clipboard not available")
+
+        elif bid == "btn-copy-question":
+            if not self._last_question:
+                self._system("  Nothing to copy yet")
+                return
+            try:
+                pyperclip.copy(self._last_question)
+                self._system("  ✓  Question copied to clipboard")
+            except Exception:
+                self._system("  ✗  Copy failed — clipboard not available")
+
+        elif bid == "btn-clear":
+            self._session_started = False
+            self._last_reply      = ""
+            self._last_question   = ""
+            self._msg_count       = 0
+            self.query_one("#messages", VerticalScroll).remove_children()
+            self._system("  ↺  Conversation cleared")
+            self.query_one("#user-input", Input).focus()
+
+        elif bid == "btn-exit":
+            self.exit()
+
+
+# ── entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    run()
+    PromptCraftApp().run()
