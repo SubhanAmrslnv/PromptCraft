@@ -13,8 +13,9 @@ The repository currently contains Claude Code configuration only; no application
 .claude/                          Claude Code configuration root
 .claude/CLAUDE.md                 This file — project guidance for Claude Code
 .claude/commands/                 Custom slash commands (Markdown files)
-  craft.md                        /craft — transforms a raw idea into an optimized Claude Code prompt
-  init.md                         /init  — verifies project setup on a new machine
+  craft.md                        /craft   — transforms a raw idea into an optimized Claude Code prompt
+  init.md                         /init    — verifies project setup on a new machine
+  migrate.md                      /migrate — migrates a VMMS legacy endpoint to V3 Service + Repository pattern
 .claude/hooks/                    Event-driven shell hooks
   git-guard.sh                    PreToolUse hook — blocks destructive git commands
   ensure-git-hooks.sh             PreToolUse hook — installs git hooks before the first commit
@@ -29,6 +30,7 @@ The repository currently contains Claude Code configuration only; no application
 |---|---|---|
 | `/craft <idea>` | `commands/craft.md` | Generate a precise Claude Code prompt from a rough request |
 | `/init` | `commands/init.md` | Verify and repair Claude Code setup on this machine |
+| `/migrate <ControllerName / ActionName>` | `commands/migrate.md` | Migrate a legacy VMMS endpoint to the V3 Service + Repository architecture |
 
 ## Claude Code Configuration
 
