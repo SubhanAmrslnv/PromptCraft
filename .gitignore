@@ -2,3 +2,4 @@ build/
 *.spec
 PromptCraft.exe
 settings.local.json
+rules.md

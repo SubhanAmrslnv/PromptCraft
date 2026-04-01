@@ -6,6 +6,7 @@ import ctypes.wintypes
 import subprocess
 import sys
 from datetime import datetime
+from pathlib import Path
 
 try:
     from textual.app import App, ComposeResult
@@ -18,11 +19,34 @@ except ImportError:
     print("Missing dependencies. Run:  pip install textual pyperclip pyfiglet")
     sys.exit(1)
 
-SYSTEM_PROMPT = (
+SYSTEM_PROMPT_BASE = (
     "Answer only what the user asks. "
     "Do not add preamble, unsolicited advice, summaries, or closing remarks. "
     "Be direct and concise."
 )
+
+RULES_FILE = Path(__file__).parent / "rules.md"
+
+ANALYZE_PROMPT = (
+    "Analyze the following assistant answer. "
+    "Extract 1–3 concise, actionable rules (one sentence each) that capture what made this answer good. "
+    "These rules will be added to the assistant's system prompt to improve future answers. "
+    "Output ONLY the rules, one per line, starting with '- '. No explanations, no preamble.\n\n"
+    "Answer:\n{answer}"
+)
+
+
+def load_rules() -> str:
+    try:
+        return RULES_FILE.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return ""
+
+
+def append_rules(new_rules: str) -> None:
+    existing = load_rules()
+    combined = (existing + "\n" + new_rules).strip()
+    RULES_FILE.write_text(combined, encoding="utf-8")
 
 
 def make_logo() -> str:
@@ -216,6 +240,15 @@ class PromptCraftApp(App):
         background: #1a1a35;
         color: #aaaaff;
     }
+    #btn-like {
+        border: tall #5c2060;
+        background: #150520;
+        color: #cc55dd;
+    }
+    #btn-like:hover {
+        background: #250835;
+        color: #ff88ff;
+    }
 
     /* ── copy cards ── */
     #cards {
@@ -277,6 +310,8 @@ class PromptCraftApp(App):
 
 [bold cyan]ℹ Info[/bold cyan]     Button — show this help
 
+[bold cyan]♥ Like[/bold cyan]     Button — analyze Claude's last answer and extract rules into the system prompt
+
 [dim]Anything else is sent to Claude as a message.[/dim]\
 """
 
@@ -286,6 +321,7 @@ class PromptCraftApp(App):
         self._last_reply      = ""
         self._last_question   = ""
         self._msg_count       = 0
+        self._rules           = load_rules()
 
     # ── layout ────────────────────────────────────────────────────────────────
 
@@ -307,6 +343,7 @@ class PromptCraftApp(App):
             yield Button("↺  Clear", id="btn-clear")
             yield Button("✕  Exit",  id="btn-exit")
             yield Button("ℹ  Info",  id="btn-info")
+            yield Button("♥  Like",  id="btn-like")
         with Horizontal(id="cards"):
             yield CopyCard("Question", card_id="card-question")
             yield CopyCard("Answer",   card_id="card-answer")
@@ -378,7 +415,10 @@ class PromptCraftApp(App):
         if self._session_started:
             cmd.append("--continue")
         else:
-            cmd += ["--append-system-prompt", SYSTEM_PROMPT]
+            system_prompt = SYSTEM_PROMPT_BASE
+            if self._rules:
+                system_prompt += "\n\nAdditional rules learned from liked answers:\n" + self._rules
+            cmd += ["--append-system-prompt", system_prompt]
 
         try:
             result = subprocess.run(cmd, capture_output=True, text=True)
@@ -418,6 +458,39 @@ class PromptCraftApp(App):
         inp.disabled = False
         inp.focus()
 
+    # ── like / rule extraction ────────────────────────────────────────────────
+
+    def _like_answer(self) -> None:
+        if not self._last_reply:
+            self._system("  Nothing to like yet")
+            return
+        self._system("  ♥  Analyzing answer — extracting rules…")
+        self._extract_rules(self._last_reply)
+
+    @work(thread=True)
+    def _extract_rules(self, answer: str) -> None:
+        prompt = ANALYZE_PROMPT.format(answer=answer)
+        result = subprocess.run(
+            ["claude", "-p", prompt, "--output-format", "text"],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            rules = result.stdout.strip()
+        else:
+            rules = ""
+        self.call_from_thread(self._on_rules_saved, rules)
+
+    def _on_rules_saved(self, rules: str) -> None:
+        if not rules:
+            self._system("  ✗  Could not extract rules — try again")
+            return
+        append_rules(rules)
+        self._rules = load_rules()
+        self._system(
+            f"  ✓  Rules learned and saved:\n"
+            + "\n".join(f"     {line}" for line in rules.splitlines())
+        )
+
     # ── helpers ───────────────────────────────────────────────────────────────
 
     def _copy(self, text: str, label: str) -> None:
@@ -448,6 +521,7 @@ class PromptCraftApp(App):
         if   bid == "btn-clear": self._do_clear()
         elif bid == "btn-info":  self._append(Static(self.INFO, classes="msg-system"))
         elif bid == "btn-exit":  self.exit()
+        elif bid == "btn-like":  self._like_answer()
 
 
 # ── console font ─────────────────────────────────────────────────────────────
