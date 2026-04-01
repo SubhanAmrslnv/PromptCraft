@@ -176,6 +176,15 @@ class PromptCraftApp(App):
         background: #250808;
         color: #ff5555;
     }
+    #btn-info {
+        border: tall #3a3a6a;
+        background: #0e0e25;
+        color: #7878cc;
+    }
+    #btn-info:hover {
+        background: #1a1a35;
+        color: #aaaaff;
+    }
     """
 
     TITLE = "PromptCraft"
@@ -207,6 +216,7 @@ class PromptCraftApp(App):
             yield Button("⎘  Question", id="btn-copy-question")
             yield Button("↺  Clear",    id="btn-clear")
             yield Button("✕  Exit",     id="btn-exit")
+            yield Button("ℹ  Info",     id="btn-info")
             yield Static("",            id="btn-spacer")
             yield Button("Answer  ⎘",  id="btn-copy-answer")
 
@@ -355,6 +365,9 @@ class PromptCraftApp(App):
             self.query_one("#messages", VerticalScroll).remove_children()
             self._system("  ↺  Conversation cleared")
             self.query_one("#user-input", Input).focus()
+
+        elif bid == "btn-info":
+            self._append(Static(self.INFO, classes="msg-system"))
 
         elif bid == "btn-exit":
             self.exit()
