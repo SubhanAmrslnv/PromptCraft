@@ -10,7 +10,7 @@ from datetime import datetime
 try:
     from textual.app import App, ComposeResult
     from textual.widgets import Static, Input, Button, Markdown
-    from textual.containers import Horizontal, Vertical, VerticalScroll
+    from textual.containers import Horizontal, VerticalScroll
     from textual import work
     import pyperclip
     import pyfiglet
@@ -34,6 +34,56 @@ def make_logo() -> str:
 
 def ts() -> str:
     return datetime.now().strftime("%H:%M")
+
+
+# ── Copy Card ─────────────────────────────────────────────────────────────────
+
+class CopyCard(Static):
+    """Clickable card that shows a content preview and copies to clipboard."""
+
+    can_focus = True
+
+    def __init__(self, label: str, card_id: str) -> None:
+        super().__init__(id=card_id)
+        self._label   = label
+        self._content = ""
+        self._refresh_display()
+
+    # ── public ────────────────────────────────────────────────────────────────
+
+    def set_content(self, text: str) -> None:
+        self._content = text
+        self._refresh_display()
+
+    # ── internal ──────────────────────────────────────────────────────────────
+
+    def _refresh_display(self) -> None:
+        preview = self._content
+        if len(preview) > 60:
+            preview = preview[:60] + "…"
+        if not preview:
+            preview = "—"
+        self.update(
+            f"[bold]{self._label}[/bold]\n"
+            f"[dim]{preview}[/dim]"
+        )
+
+    def _show_feedback(self, ok: bool) -> None:
+        icon = "✓  Copied!" if ok else "✗  Failed"
+        color = "green" if ok else "red"
+        self.update(f"[bold]{self._label}[/bold]\n[{color}]{icon}[/{color}]")
+        self.set_timer(1.5, self._refresh_display)
+
+    # ── events ────────────────────────────────────────────────────────────────
+
+    def on_click(self) -> None:
+        if not self._content:
+            return
+        try:
+            pyperclip.copy(self._content)
+            self._show_feedback(ok=True)
+        except Exception:
+            self._show_feedback(ok=False)
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -123,10 +173,10 @@ class PromptCraftApp(App):
         border: round cyan;
     }
 
-    /* ── buttons ── */
+    /* ── action buttons ── */
     #buttons {
         height: auto;
-        padding: 1 3 1 3;
+        padding: 1 3 0 3;
         align: left middle;
     }
     Button {
@@ -138,27 +188,6 @@ class PromptCraftApp(App):
     }
     Button:hover {
         text-style: bold;
-    }
-    #btn-spacer {
-        width: 1fr;
-    }
-    #btn-copy-answer {
-        border: tall #1e5c78;
-        background: #071520;
-        color: #4aaccc;
-    }
-    #btn-copy-answer:hover {
-        background: #0d2535;
-        color: #00ffff;
-    }
-    #btn-copy-question {
-        border: tall #1e5830;
-        background: #071508;
-        color: #4acc70;
-    }
-    #btn-copy-question:hover {
-        background: #0d2812;
-        color: #00ff7f;
     }
     #btn-clear {
         border: tall #5c5010;
@@ -187,9 +216,69 @@ class PromptCraftApp(App):
         background: #1a1a35;
         color: #aaaaff;
     }
+
+    /* ── copy cards ── */
+    #cards {
+        height: 5;
+        padding: 1 3 1 3;
+    }
+    CopyCard {
+        height: 4;
+        padding: 0 2;
+        border: round #4d4d4d;
+        background: #161616;
+        color: #808080;
+    }
+    CopyCard:hover {
+        border: round #808080;
+        text-style: bold;
+    }
+    #card-question {
+        width: 1fr;
+        border: round #1e5830;
+        background: #071508;
+        color: #4acc70;
+        margin: 0 1 0 0;
+    }
+    #card-question:hover {
+        border: round #4acc70;
+        background: #0d2812;
+    }
+    #card-answer {
+        width: 1fr;
+        border: round #1e5c78;
+        background: #071520;
+        color: #4aaccc;
+    }
+    #card-answer:hover {
+        border: round #4aaccc;
+        background: #0d2535;
+    }
     """
 
     TITLE = "PromptCraft"
+
+    INFO = """\
+[bold cyan]/info[/bold cyan]      Show this help message
+
+[bold cyan]/clear[/bold cyan]     Start a new conversation — wipes history and resets the session
+
+[bold cyan]ca[/bold cyan]         Copy Claude's last answer to the clipboard
+
+[bold cyan]cq[/bold cyan]         Copy your last question to the clipboard
+
+[bold cyan]Question[/bold cyan]   Card (bottom left)  — click to copy your last question
+
+[bold cyan]Answer[/bold cyan]     Card (bottom right) — click to copy Claude's last answer
+
+[bold cyan]↺ Clear[/bold cyan]    Button — same as typing [bold cyan]/clear[/bold cyan]
+
+[bold cyan]✕ Exit[/bold cyan]     Button — close the application
+
+[bold cyan]ℹ Info[/bold cyan]     Button — show this help
+
+[dim]Anything else is sent to Claude as a message.[/dim]\
+"""
 
     def __init__(self):
         super().__init__()
@@ -215,12 +304,12 @@ class PromptCraftApp(App):
                 id="user-input",
             )
         with Horizontal(id="buttons"):
-            yield Button("⎘  Question", id="btn-copy-question")
-            yield Button("↺  Clear",    id="btn-clear")
-            yield Button("✕  Exit",     id="btn-exit")
-            yield Button("ℹ  Info",     id="btn-info")
-            yield Static("",            id="btn-spacer")
-            yield Button("Answer  ⎘",  id="btn-copy-answer")
+            yield Button("↺  Clear", id="btn-clear")
+            yield Button("✕  Exit",  id="btn-exit")
+            yield Button("ℹ  Info",  id="btn-info")
+        with Horizontal(id="cards"):
+            yield CopyCard("Question", card_id="card-question")
+            yield CopyCard("Answer",   card_id="card-answer")
 
     def on_mount(self) -> None:
         self.query_one("#user-input", Input).focus()
@@ -241,26 +330,6 @@ class PromptCraftApp(App):
 
     # ── input handler ─────────────────────────────────────────────────────────
 
-    INFO = """\
-[bold cyan]/info[/bold cyan]           Show this help message
-
-[bold cyan]/clear[/bold cyan]          Start a new conversation — wipes chat history and resets the session
-
-[bold cyan]ca[/bold cyan]              Copy Claude's last answer to the clipboard
-
-[bold cyan]cq[/bold cyan]              Copy your last question to the clipboard
-
-[bold cyan]Answer ⎘[/bold cyan]        Button (bottom right) — same as typing [bold cyan]ca[/bold cyan]
-
-[bold cyan]⎘ Question[/bold cyan]      Button (bottom left)  — same as typing [bold cyan]cq[/bold cyan]
-
-[bold cyan]↺ Clear[/bold cyan]         Button — same as typing [bold cyan]/clear[/bold cyan]
-
-[bold cyan]✕ Exit[/bold cyan]          Button — close the application
-
-[dim]Anything else is sent to Claude as a message.[/dim]\
-"""
-
     def on_input_submitted(self, event: Input.Submitted) -> None:
         text = event.value.strip()
         if not text:
@@ -271,9 +340,23 @@ class PromptCraftApp(App):
             self._append(Static(self.INFO, classes="msg-system"))
             return
 
-        self._msg_count      += 1
-        self._last_question   = text
+        if text.lower() == "ca":
+            self._copy(self._last_reply, "Answer")
+            return
+
+        if text.lower() == "cq":
+            self._copy(self._last_question, "Question")
+            return
+
+        if text.lower() == "/clear":
+            self._do_clear()
+            return
+
+        self._msg_count    += 1
+        self._last_question = text
         n = self._msg_count
+
+        self.query_one("#card-question", CopyCard).set_content(text)
 
         self._append(
             Static(
@@ -320,6 +403,7 @@ class PromptCraftApp(App):
         if success:
             self._session_started = True
             self._last_reply      = reply
+            self.query_one("#card-answer", CopyCard).set_content(reply)
 
         label = Static(
             f"[#595959]#{n}[/#595959]  [bold bright_blue]Claude[/bold bright_blue]  [#595959]{ts()}[/#595959]",
@@ -334,45 +418,36 @@ class PromptCraftApp(App):
         inp.disabled = False
         inp.focus()
 
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _copy(self, text: str, label: str) -> None:
+        if not text:
+            self._system(f"  Nothing to copy yet")
+            return
+        try:
+            pyperclip.copy(text)
+            self._system(f"  ✓  {label} copied to clipboard")
+        except Exception:
+            self._system("  ✗  Copy failed — clipboard not available")
+
+    def _do_clear(self) -> None:
+        self._session_started = False
+        self._last_reply      = ""
+        self._last_question   = ""
+        self._msg_count       = 0
+        self.query_one("#messages", VerticalScroll).remove_children()
+        self.query_one("#card-question", CopyCard).set_content("")
+        self.query_one("#card-answer",   CopyCard).set_content("")
+        self._system("  ↺  Conversation cleared")
+        self.query_one("#user-input", Input).focus()
+
     # ── button handler ────────────────────────────────────────────────────────
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id
-
-        if bid == "btn-copy-answer":
-            if not self._last_reply:
-                self._system("  Nothing to copy yet")
-                return
-            try:
-                pyperclip.copy(self._last_reply)
-                self._system("  ✓  Answer copied to clipboard")
-            except Exception:
-                self._system("  ✗  Copy failed — clipboard not available")
-
-        elif bid == "btn-copy-question":
-            if not self._last_question:
-                self._system("  Nothing to copy yet")
-                return
-            try:
-                pyperclip.copy(self._last_question)
-                self._system("  ✓  Question copied to clipboard")
-            except Exception:
-                self._system("  ✗  Copy failed — clipboard not available")
-
-        elif bid == "btn-clear":
-            self._session_started = False
-            self._last_reply      = ""
-            self._last_question   = ""
-            self._msg_count       = 0
-            self.query_one("#messages", VerticalScroll).remove_children()
-            self._system("  ↺  Conversation cleared")
-            self.query_one("#user-input", Input).focus()
-
-        elif bid == "btn-info":
-            self._append(Static(self.INFO, classes="msg-system"))
-
-        elif bid == "btn-exit":
-            self.exit()
+        if   bid == "btn-clear": self._do_clear()
+        elif bid == "btn-info":  self._append(Static(self.INFO, classes="msg-system"))
+        elif bid == "btn-exit":  self.exit()
 
 
 # ── console font ─────────────────────────────────────────────────────────────
@@ -391,10 +466,8 @@ class _CONSOLE_FONT_INFOEX(ctypes.Structure):
     ]
 
 def set_console_font_size(pt: int) -> None:
-    """Set the Windows console font size (point size → pixel height)."""
     try:
-        STD_OUTPUT_HANDLE = ctypes.wintypes.DWORD(-11)
-        handle = ctypes.windll.kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
+        handle = ctypes.windll.kernel32.GetStdHandle(ctypes.wintypes.DWORD(-11))
         font = _CONSOLE_FONT_INFOEX()
         font.cbSize = ctypes.sizeof(_CONSOLE_FONT_INFOEX)
         ctypes.windll.kernel32.GetCurrentConsoleFontEx(handle, False, ctypes.byref(font))
@@ -402,11 +475,11 @@ def set_console_font_size(pt: int) -> None:
         font.dwFontSize.Y = pt
         ctypes.windll.kernel32.SetCurrentConsoleFontEx(handle, False, ctypes.byref(font))
     except Exception:
-        pass  # non-Windows or unsupported console — silently skip
+        pass
 
 
 # ── entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    set_console_font_size(16)   # ~12pt at 96 DPI
+    set_console_font_size(16)
     PromptCraftApp().run()
