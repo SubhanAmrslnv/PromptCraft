@@ -58,7 +58,8 @@ def _base_dir() -> Path:
     return Path(__file__).parent
 
 
-RULES_FILE = _base_dir() / "rules.md"
+RULES_FILE  = _base_dir() / "rules.md"
+CHAT_MODEL  = "haiku"   # alias: haiku | sonnet | opus  (haiku = fastest, no extended thinking)
 
 ANALYZE_PROMPT = (
     "Analyze the following assistant answer. "
@@ -425,7 +426,7 @@ class PromptCraftApp(App):
 
     @work(thread=True)
     def _call_claude(self, message: str, n: int) -> None:
-        cmd = ["claude", "-p", message, "--output-format", "text"]
+        cmd = ["claude", "-p", message, "--model", CHAT_MODEL, "--output-format", "text"]
         if self._session_started:
             cmd.append("--continue")
         else:
@@ -485,7 +486,7 @@ class PromptCraftApp(App):
     def _extract_rules(self, answer: str) -> None:
         prompt = ANALYZE_PROMPT.format(answer=answer)
         result = subprocess.run(
-            ["claude", "-p", prompt, "--output-format", "text"],
+            ["claude", "-p", prompt, "--model", CHAT_MODEL, "--output-format", "text"],
             capture_output=True, text=True,
         )
         if result.returncode == 0:
