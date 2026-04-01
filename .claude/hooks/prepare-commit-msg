@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# prepare-commit-msg — auto-add a file-change summary and strip Co-Authored-By: Claude lines.
+set -euo pipefail
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="${2:-}"
+
+# Skip merges, squashes, and fixups — they already have a message
+[[ "$COMMIT_SOURCE" =~ ^(merge|squash|commit)$ ]] && exit 0
+
+# Strip Co-Authored-By: Claude lines (removes the Claude icon line)
+tmp=$(mktemp)
+grep -v "Co-Authored-By:.*[Cc]laude" "$COMMIT_MSG_FILE" > "$tmp" || true
+mv "$tmp" "$COMMIT_MSG_FILE"
+
+# If a body already exists (non-empty, non-comment line after the subject), stop here
+body=$(tail -n +3 "$COMMIT_MSG_FILE" | grep -v '^#' | grep -v '^[[:space:]]*$' || true)
+[[ -n "$body" ]] && exit 0
+
+# Generate a short file-change summary from the staged diff
+stats=$(git diff --cached --stat 2>/dev/null | head -20 || true)
+[[ -z "$stats" ]] && exit 0
+
+printf '\n%s\n' "$stats" >> "$COMMIT_MSG_FILE"

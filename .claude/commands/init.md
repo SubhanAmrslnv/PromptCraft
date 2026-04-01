@@ -22,14 +22,49 @@ If the file is missing or empty, write the following default content to it:
 {
   "permissions": {
     "allow": [],
-    "deny": []
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(git clean -fd*)",
+      "Bash(git checkout -- *)",
+      "Bash(git restore .)",
+      "Bash(git branch -D*)",
+      "Bash(git rebase -i*)",
+      "Bash(git commit --amend*)",
+      "Bash(git reflog delete*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/ensure-git-hooks.sh"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
 
 Do not overwrite an existing non-empty `settings.json`.
 
-## 4. Verify ANTHROPIC_API_KEY
+## 4. Install git hooks
+
+Check if `.git/hooks/prepare-commit-msg` exists.
+If it does not, copy `.claude/hooks/prepare-commit-msg` to `.git/hooks/prepare-commit-msg` and make it executable:
+
+```sh
+cp .claude/hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
+chmod +x .git/hooks/prepare-commit-msg
+```
+
+## 5. Verify ANTHROPIC_API_KEY
 
 Check if the `ANTHROPIC_API_KEY` environment variable is set.
 If it is not set, remind the user to add it to their shell profile (`~/.bashrc` or `~/.zshrc`):
@@ -40,7 +75,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 This key is required when using Claude API features from within PromptCraft.
 
-## 5. Report
+## 6. Report
 
 Print a concise summary table:
 
@@ -50,6 +85,7 @@ Print a concise summary table:
 | `.claude/hooks/` | ✓ exists / ✗ created |
 | `.claude/commands/craft.md` | ✓ exists / ✗ missing |
 | `.claude/settings.json` | ✓ valid / ✗ written default / ✗ missing |
+| `.git/hooks/prepare-commit-msg` | ✓ installed / ✗ installed now |
 | `ANTHROPIC_API_KEY` | ✓ set / ✗ not set |
 
 List any manual steps the user still needs to take.
