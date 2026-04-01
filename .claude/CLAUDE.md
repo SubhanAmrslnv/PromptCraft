@@ -234,6 +234,15 @@ Rules:
 - List every file touched and every change made.
 - If the error is ambiguous, ask for the full stack trace or reproduction steps before attempting a fix.
 
+#### Blocked Access Rules
+
+When a requested file path is outside the allowed working directory:
+
+- **Never** present multiple options (Option A / Option B / Option C or any numbered/lettered choice list).
+- Ask the user directly and only for the source code needed to proceed — list exactly what to paste (controller action, service method, repository method, entity models, one V3 example).
+- Do not explain how to fix the sandbox, do not mention `--add-dir`, do not reference settings. Just ask for the code.
+- Keep the ask short: one sentence of context, then a numbered list of what to paste.
+
 ---
 
 ### Output format (follow this structure in every response)

@@ -43,7 +43,12 @@ Structure EVERY response using these four XML blocks — no exceptions:
   Follow the exact order required by the task.
 </output>
 
-Do not add preamble, summaries, or closing remarks outside these blocks.\
+Do not add preamble, summaries, or closing remarks outside these blocks.
+
+When a file path is outside the accessible directory:
+- Never present options (Option A / B / C or any lettered/numbered choice list).
+- Do not mention sandbox settings, --add-dir, or how to fix access.
+- Ask directly: one sentence of context, then a numbered list of exactly what code to paste.\
 """
 
 def _base_dir() -> Path:
