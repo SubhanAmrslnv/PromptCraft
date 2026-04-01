@@ -124,6 +124,7 @@ The user pastes a compilation error, runtime exception, stack trace, or describe
 - If any dependent classes or methods exist in the old project, locate them and reuse the same logic.
 - Do not redesign the API or improve the logic — keep behavior identical to the legacy endpoint.
 - Maintain identical behavior and validation checks.
+- Preserve the original error handling structure exactly — keep every try/catch/throw/finally block from the legacy code. Do not add, remove, or rewrap exception handling unless the migration itself introduces a new failure point.
 
 #### DTO Rules
 
@@ -164,7 +165,8 @@ Rules:
 - Create a dedicated response DTO if the endpoint returns complex data.
 - Naming: `{ActionName}ResponseDto`.
 - Contain ONLY fields the frontend consumes.
-- If the legacy endpoint returns a simple scalar (string ID, boolean), return it directly — no DTO needed.
+- If the user explicitly defines a response shape (even a single `bool` or `string`), always create the DTO — do not collapse it to a raw scalar.
+- If the legacy endpoint returns a simple scalar and the user has NOT defined a shape, return it directly — no DTO needed.
 - Place in the appropriate `DTOs/Responses` folder per V3 conventions.
 
 **DTO Design:**
@@ -175,15 +177,61 @@ Rules:
 - JSON field names and nesting must remain backward-compatible with what the frontend currently expects.
 
 #### Performance Rules
-- Pass `CancellationToken` through the entire call chain: Controller → Service → Repository → DbContext.
-- Use `AsNoTracking()` on all EF Core read queries where entities are not saved back.
+- Pass `CancellationToken` through the entire call chain: Controller → Service → Repository.
 - Replace `IEnumerable<T>` from Repository methods with `IReadOnlyList<T>` or `IReadOnlyCollection<T>`.
 - Use `async/await` correctly — no `.Result`, `.Wait()`, or `Task.Run()` wrapping async calls.
 - Use `Task.WhenAll()` for multiple independent async calls with no data dependency between them.
 - Use `ConfigureAwait(false)` in Service and Repository layers.
-- Use projection (`.Select()`) in the Repository instead of loading full entity graphs.
 - Avoid N+1 patterns — batch queries with `WHERE Id IN (...)` instead of per-item queries.
-- Register Services and Repositories as `Scoped`. Never register DbContext-dependent services as `Singleton`.
+- Register Services and Repositories as `Scoped`.
+
+**EF Core only:**
+- Use `AsNoTracking()` on read queries where entities are not saved back.
+- Use projection (`.Select()`) instead of loading full entity graphs.
+- Never register `DbContext`-dependent services as `Singleton`.
+
+**Dapper only — see Dapper Rules below.**
+
+#### Dapper Rules
+
+Apply these rules whenever the repository uses Dapper instead of EF Core.
+
+**Connection management:**
+- Inject `IDbConnection` (or a factory) into the Repository constructor via DI.
+- Register the connection as `Transient` or open/close it per method using `using`.
+- Never hold an open connection across method boundaries.
+
+**Oracle 19c parameter syntax:**
+- Always use `:paramName` — never `@paramName`. Oracle does not recognise the `@` prefix.
+- Bind parameters via `DynamicParameters`:
+  ```csharp
+  var p = new DynamicParameters();
+  p.Add(":Id", id);
+  p.Add(":Status", status);
+  await connection.ExecuteAsync(sql, p);
+  ```
+
+**Async Dapper:**
+- Use async methods only: `QueryAsync`, `ExecuteAsync`, `QueryFirstOrDefaultAsync`, `QuerySingleOrDefaultAsync`.
+- Pass `CancellationToken` where the Dapper overload accepts it; omit silently where it does not.
+
+**SQL:**
+- Write SQL as verbatim strings (`@" ... "`). Never concatenate user input into SQL.
+- Column names and table names must match the Oracle schema exactly (case-insensitive in Oracle, but keep consistent with the legacy SQL).
+- Preserve the exact SQL from the legacy repository — do not rewrite or optimise queries.
+
+**Mapping:**
+- Use Dapper's default column-to-property mapping. If names diverge, use `QueryAsync<T>` with an explicit `splitOn` or a custom `TypeHandler` — not manual mapping in the service.
+- Return `IReadOnlyList<T>` from multi-row queries: `(await conn.QueryAsync<T>(...)).ToList()`.
+
+**DI registration:**
+```csharp
+// Oracle connection — Transient so each repository call gets a fresh connection
+builder.Services.AddTransient<IDbConnection>(_ =>
+    new OracleConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<ICaseRepository, CaseRepository>();
+builder.Services.AddScoped<ICaseService, CaseService>();
+```
 
 #### Clean Code and DRY Rules
 
@@ -265,7 +313,11 @@ Respond in this exact order:
 12. **DI registration** — Scoped lifetime for Service and Repository.
 13. **Verification** — confirm route is unchanged, JSON shape is backward-compatible, behavior is identical.
 
-Deliver every file complete and production-ready: Request DTO, Response DTO (if applicable), Controller, Service interface, Service implementation, Repository interface, Repository implementation, mapping logic, DI registration, and any supporting models.
+Deliver every file complete, production-ready, and fully compilable in .NET 8 without modification:
+- Every file must include all `using` statements, the correct `namespace`, and the full class/record body.
+- No placeholder comments like `// ... rest of code`. Every method must be complete.
+- DI registrations must be included and ready to paste into `Program.cs`.
+- Request DTO, Response DTO (if applicable), Controller, Service interface, Service implementation, Repository interface, Repository implementation, mapping logic, DI registration, and any supporting models.
 
 #### Mode 2 — Error Fix Response
 
