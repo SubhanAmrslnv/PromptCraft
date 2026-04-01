@@ -4,8 +4,12 @@ pip install -r requirements.txt
 
 echo.
 echo Building PromptCraft.exe...
-pyinstaller --onefile --console --name PromptCraft chat.py
+pyinstaller --onefile --console --name PromptCraft --distpath . --workpath build\tmp --specpath build chat.py
+
+echo.
+echo Cleaning up build artifacts...
+rmdir /s /q build
 
 echo.
 echo Build complete. Launching PromptCraft...
-start "" "dist\PromptCraft.exe"
+start "" "PromptCraft.exe"
