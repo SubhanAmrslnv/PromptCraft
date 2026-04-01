@@ -129,13 +129,16 @@ class PromptCraftApp(App):
     }
     Button {
         margin: 0 1 0 0;
-        min-width: 18;
+        min-width: 14;
         border: tall #4d4d4d;
         background: #161616;
         color: #808080;
     }
     Button:hover {
         text-style: bold;
+    }
+    #btn-spacer {
+        width: 1fr;
     }
     #btn-copy-answer {
         border: tall #1e5c78;
@@ -201,10 +204,11 @@ class PromptCraftApp(App):
                 id="user-input",
             )
         with Horizontal(id="buttons"):
-            yield Button("⎘  Copy Answer",   id="btn-copy-answer")
-            yield Button("⎘  Copy Question", id="btn-copy-question")
-            yield Button("↺  Clear Chat",    id="btn-clear")
-            yield Button("✕  Exit",          id="btn-exit")
+            yield Button("⎘  Question", id="btn-copy-question")
+            yield Button("↺  Clear",    id="btn-clear")
+            yield Button("✕  Exit",     id="btn-exit")
+            yield Static("",            id="btn-spacer")
+            yield Button("Answer  ⎘",  id="btn-copy-answer")
 
     def on_mount(self) -> None:
         self.query_one("#user-input", Input).focus()
@@ -234,11 +238,11 @@ class PromptCraftApp(App):
 
 [bold cyan]cq[/bold cyan]              Copy your last question to the clipboard
 
-[bold cyan]⎘ Copy Answer[/bold cyan]   Button — same as typing [bold cyan]ca[/bold cyan]
+[bold cyan]Answer ⎘[/bold cyan]        Button (bottom right) — same as typing [bold cyan]ca[/bold cyan]
 
-[bold cyan]⎘ Copy Question[/bold cyan] Button — same as typing [bold cyan]cq[/bold cyan]
+[bold cyan]⎘ Question[/bold cyan]      Button (bottom left)  — same as typing [bold cyan]cq[/bold cyan]
 
-[bold cyan]↺ Clear Chat[/bold cyan]    Button — same as typing [bold cyan]/clear[/bold cyan]
+[bold cyan]↺ Clear[/bold cyan]         Button — same as typing [bold cyan]/clear[/bold cyan]
 
 [bold cyan]✕ Exit[/bold cyan]          Button — close the application
 
